@@ -1,0 +1,1638 @@
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<title>Gerador de Adaptações</title>
+<style>
+  :root {
+    --bg: #f1f5f9; --surface: #fff; --border: #e2e8f0; --text: #0f172a;
+    --muted: #64748b; --primary: #2563eb; --primary-hover: #1d4ed8; --danger: #dc2626;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); }
+  .page { max-width: 1180px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+  /* App bar */
+  .topbar { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.82);
+    -webkit-backdrop-filter: saturate(1.6) blur(10px); backdrop-filter: saturate(1.6) blur(10px);
+    border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+  .topbar-inner { max-width: 1180px; margin: 0 auto; padding: .8rem 1.5rem; display: flex; align-items: center;
+    justify-content: space-between; gap: 1rem 1.25rem; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+  .brand-logo { width: 42px; height: 42px; border-radius: 12px; flex: none; display: grid; place-items: center;
+    background: linear-gradient(135deg, #2563eb, #7c3aed); box-shadow: 0 6px 16px rgba(37,99,235,.35); }
+  .brand-logo svg { width: 22px; height: 22px; display: block; }
+  .brand-text h1 { margin: 0; font-size: 1.18rem; font-weight: 750; letter-spacing: -.015em; line-height: 1.15; }
+  .brand-text span { display: block; font-size: .78rem; color: var(--muted); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .layout { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .card h2 { margin: 0 0 1rem; font-size: 1.05rem; }
+  .hidden { display: none !important; }
+  .uploadBtn { width: 100%; padding: .85rem 1rem; border: 1px dashed var(--primary); background: #eff6ff;
+    color: var(--primary); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; }
+  .uploadBtn:hover { background: #dbeafe; }
+  .origPreview { margin-top: 1rem; }
+  .origPreview img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px;
+    border: 1px solid var(--border); background: #f8fafc; display: block; margin: 0 auto; }
+  .checklist { list-style: none; margin: 0 0 1.25rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+  .sizeCat { list-style: none; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
+    color: var(--muted); margin: .75rem 0 .35rem; }
+  .sizeCat:first-child { margin-top: 0; }
+  .checkItem { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; }
+  .checkItem:hover { border-color: var(--primary); background: #f8fafc; }
+  .checkItem input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .checkName { font-weight: 600; font-size: .9rem; }
+  .checkDims { margin-left: auto; font-size: .8rem; color: var(--muted); }
+  .genBtn { width: 100%; padding: .9rem 1rem; border: none; background: var(--primary); color: #fff;
+    border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; }
+  .genBtn:hover:not(:disabled) { background: var(--primary-hover); }
+  .genBtn:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .note { font-size: .78rem; color: var(--muted); margin: .6rem 0 0; }
+  .results { display: flex; flex-direction: column; gap: 1.25rem; }
+  .resultCard { border: 1px solid var(--border); border-radius: 10px; padding: 1rem; display: flex;
+    flex-direction: column; gap: .75rem; }
+  .resultHead { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+  .resultHead strong { font-size: .95rem; }
+  .resultHead .dims { font-size: .8rem; color: var(--muted); }
+  /* Xadrez bem visível para evidenciar transparência (fundo removido) */
+  .resultImg { width: 100%; object-fit: contain; border-radius: 8px; border: 1px solid var(--border);
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #c3cad6 25%, transparent 25%),
+      linear-gradient(-45deg, #c3cad6 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #c3cad6 75%),
+      linear-gradient(-45deg, transparent 75%, #c3cad6 75%);
+    background-size: 22px 22px;
+    background-position: 0 0, 0 11px, 11px -11px, -11px 0; }
+  .status { font-size: .85rem; color: var(--muted); display: flex; align-items: center; gap: .5rem; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--primary);
+    border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .dlBtn { padding: .6rem .9rem; border: none; background: var(--primary); color: #fff; border-radius: 8px;
+    font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
+  .dlBtn:hover { background: var(--primary-hover); }
+  .placeholder { color: var(--muted); margin: 0; }
+  .err { color: var(--danger); font-size: .85rem; }
+  .banner { background: #fef2f2; border: 1px solid #fecaca; color: var(--danger); border-radius: 8px;
+    padding: .75rem 1rem; margin-top: 1rem; text-align: center; }
+  /* Abas */
+  /* Abas — segmented control */
+  .tabs { display: inline-flex; background: #eef1f6; border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; }
+  .tab { border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .88rem;
+    padding: .5rem 1rem; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.14); }
+  @media (max-width: 560px) { .brand-text span { display: none; } .topbar-inner { padding: .7rem 1rem; } .tabs { width: 100%; } .tab { flex: 1; text-align: center; } }
+  /* Estampas */
+  .subtabs { display: flex; gap: .4rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; flex-wrap: wrap; }
+  .subtab { padding: .5rem .9rem; border: none; background: none; color: var(--muted); font-size: .9rem;
+    font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .subtab:hover { color: var(--text); }
+  .subtab.active { color: var(--primary); border-bottom-color: var(--primary); }
+  .estCat { margin-bottom: 1.75rem; }
+  .estCat h3 { margin: 0 0 .75rem; font-size: 1rem; }
+  .estItem { border: 1px solid var(--border); border-radius: 10px; margin-bottom: .6rem; overflow: hidden; }
+  .estItem.done { border-color: #86efac; background: #f0fdf4; }
+  .estItem.done .estHead { background: #f0fdf4; }
+  .estItem.done .estHead:hover { background: #dcfce7; }
+  .estItem.done .covTxt { color: #16a34a; font-weight: 600; }
+  .doneHeader { display: flex; align-items: center; gap: .5rem; margin: 1.5rem 0 .75rem; font-size: .95rem; color: #16a34a; }
+  .doneHeader svg { width: 18px; height: 18px; }
+  .estHead { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; cursor: pointer; background: var(--surface); }
+  .estHead:hover { background: #f8fafc; }
+  .estRank { font-weight: 700; color: var(--muted); min-width: 1.5rem; }
+  .estNameWrap { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; }
+  .estName { font-weight: 600; }
+  .estActions { display: flex; gap: .25rem; }
+  .iconBtn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
+    cursor: pointer; text-decoration: none; padding: 0; }
+  .iconBtn:hover { color: var(--primary); border-color: var(--primary); background: #f8fafc; }
+  .iconBtn.ok { color: #16a34a; border-color: #16a34a; }
+  .iconBtn svg { width: 14px; height: 14px; display: block; }
+  .estCov { display: flex; align-items: center; gap: .5rem; white-space: nowrap; }
+  .covBar { width: 84px; height: 7px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+  .covFill { display: block; height: 100%; background: #16a34a; }
+  .covTxt { font-size: .8rem; color: var(--muted); }
+  .covTxt b { color: #16a34a; }
+  .estSales { font-size: .82rem; color: var(--muted); white-space: nowrap; min-width: 72px; text-align: right; }
+  @media (max-width: 640px) { .estCov .covBar { display: none; } }
+  .estChevron { color: var(--muted); transition: transform .15s; }
+  .estItem.open .estChevron { transform: rotate(90deg); }
+  .estBody { padding: .5rem 1rem 1rem; border-top: 1px solid var(--border); background: #fbfcfe; }
+  .covGroup { margin-top: .75rem; }
+  .covGroup h4 { margin: 0 0 .4rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .covList { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .4rem; }
+  .covItem { display: flex; align-items: center; gap: .5rem; padding: .45rem .6rem; border: 1px solid var(--border);
+    border-radius: 8px; font-size: .88rem; background: var(--surface); }
+  .covItem .mark { font-size: 1rem; }
+  .covItem.has { color: var(--text); }
+  .covItem.miss { color: var(--muted); }
+  .adaptBtn { margin-left: auto; padding: .3rem .6rem; border: none; border-radius: 6px; font-size: .75rem;
+    font-weight: 600; cursor: pointer; background: var(--primary); color: #fff; }
+  .adaptBtn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+  /* Adaptar por ID */
+  .idbar { display: flex; gap: .5rem; margin: .75rem 0 1rem; flex-wrap: wrap; }
+  .idbar .amInput { flex: 1; min-width: 200px; }
+  .idGoBtn { width: auto; padding: .7rem 1.4rem; }
+  .idInfo { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem;
+    display: flex; flex-direction: column; gap: .35rem; font-size: .92rem; }
+  .idLabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-right: .3rem; }
+  .idCovTitle { font-size: 1rem; margin: 1.25rem 0 .5rem; }
+  /* Painel Adaptar inline */
+  .adaptPanel { display: none; margin-top: 1rem; padding: 1rem; border: 1px solid var(--primary);
+    border-radius: 10px; background: #eef4ff; }
+  .adaptPanel.open { display: block; }
+  .apHead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+  .apHead strong { font-size: .95rem; }
+  .amInput { width: 100%; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: 8px; font-size: .9rem; }
+  .amOr { text-align: center; color: var(--muted); font-size: .8rem; margin: .6rem 0; }
+  .amProgress { display: flex; align-items: center; gap: .6rem; color: var(--muted); padding: 1rem 0; }
+  .apImg { width: 100%; max-width: 520px; }
+  .apCheck { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: var(--text);
+    margin-top: .75rem; cursor: pointer; }
+  .apCheck input { width: 16px; height: 16px; accent-color: var(--primary); }
+  /* Seletor "tipo de estampa" (Localizada / Pattern) — usado nos 2 fluxos */
+  .tipoField { margin: 0 0 1rem; }
+  .tipoLabel { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--muted); margin-bottom: .4rem; }
+  .tipoSeg { display: inline-flex; width: 100%; background: #eef1f6; border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 3px; }
+  .tipoBtn { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .85rem;
+    padding: .5rem .6rem; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
+  .tipoBtn:hover { color: var(--text); }
+  .tipoBtn.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.14); }
+  .tipoHint { font-size: .75rem; color: var(--muted); margin: .4rem 0 0; }
+  /* Adaptar PSD */
+  .psdLayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; max-height: 340px; overflow: auto; }
+  .psdLayer { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  .psdLayer.bg { background: #f1f5f9; }
+  .psdThumb { width: 34px; height: 34px; flex: none; border-radius: 6px; border: 1px solid var(--border); object-fit: contain;
+    background-color: #fff;
+    background-image: linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);
+    background-size: 12px 12px; background-position: 0 0,0 6px,6px -6px,-6px 0; }
+  .psdLayerName { font-size: .85rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .psdGroupTag { display: block; font-size: .68rem; font-weight: 500; color: var(--muted); margin-top: 1px; }
+  .psdOpenFolder { color: var(--primary); border-color: var(--primary); background: #eff6ff; }
+  .psdOpenFolder:hover { background: #dbeafe; }
+  .psdSplit { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
+  .psdSplit:hover { background: #ede9fe; }
+  .psdLayerBadge { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 999px; padding: .1rem .45rem; cursor: pointer; user-select: none; }
+  .psdLayer.bg .psdLayerBadge { color: var(--primary); border-color: var(--primary); background: #eff6ff; }
+  .psdEye { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
+    cursor: pointer; flex: none; font-size: .9rem; }
+  .psdEye.off { opacity: .4; }
+  .psdStar { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+    cursor: pointer; flex: none; font-size: .9rem; filter: grayscale(1); opacity: .55; padding: 0; }
+  .psdStar:hover { opacity: .85; }
+  .psdStar.on { filter: none; opacity: 1; border-color: #f59e0b; background: #fffbeb; }
+  .psdControls { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; }
+  .psdCtl { display: flex; flex-direction: column; gap: .35rem; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .psdBtnRow { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .psdBtnRow .psdMiniBtn { flex: 1 1 30%; }
+  .psdMiniBtn { flex: 1; padding: .55rem .5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; }
+  .psdMiniBtn:hover { border-color: var(--primary); color: var(--primary); }
+  .psdMiniBtn.active { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
+  .psdStageWrap { display: flex; justify-content: center; margin-top: .5rem; }
+  .psdStage { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; touch-action: none;
+    background-color: #fff;
+    background-image: linear-gradient(45deg,#c3cad6 25%,transparent 25%),linear-gradient(-45deg,#c3cad6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c3cad6 75%),linear-gradient(-45deg,transparent 75%,#c3cad6 75%);
+    background-size: 22px 22px; background-position: 0 0,0 11px,11px -11px,-11px 0; }
+  .psdBgLayer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .psdEl { position: absolute; cursor: grab; z-index: 1; outline: 1px dashed transparent; }
+  .psdEl:hover { outline-color: rgba(37,99,235,.4); }
+  .psdEl.sel { outline: 1.5px solid var(--primary); z-index: 5; }
+  .psdEl img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+  .psdEl.dragging { cursor: grabbing; }
+  .psdEl.ghost { pointer-events: none; outline: none; opacity: .92; z-index: 0; }
+  .psdEl.ghost:hover { outline: none; }
+  .psdCheckLbl { flex-direction: row; align-items: center; gap: .5rem; text-transform: none; letter-spacing: 0;
+    font-weight: 600; color: var(--text); font-size: .82rem; cursor: pointer; }
+  .psdCheckLbl input { width: 16px; height: 16px; flex: none; accent-color: var(--primary); }
+  .psdHandle { position: absolute; right: -7px; bottom: -7px; width: 15px; height: 15px; background: var(--primary);
+    border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize; z-index: 6; box-shadow: 0 1px 3px rgba(0,0,0,.3); display: none; }
+  .psdEl.sel .psdHandle { display: block; }
+  /* Sidebar fixa com scroll interno e "Gerar" fixo no rodapé (só no layout de 2 colunas) */
+  #view-psd .psdSideScroll { display: flex; flex-direction: column; gap: 1.5rem; }
+  .psdGerarBar { padding-top: .25rem; }
+  .psdGerarBar .genBtn { width: 100%; }
+  @media (min-width: 821px) {
+    #view-psd .psdSideCol { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 100px); }
+    #view-psd .psdSideScroll { overflow-y: auto; padding-right: 3px; }
+    #view-psd .psdGerarBar { margin-top: auto; }
+  }
+  /* Blocos de editor (um por produto marcado) */
+  .psdBlock { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .psdBlockHead { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .75rem; }
+  .psdBlockHead strong { font-size: 1rem; }
+  .psdBlockHead .dims { font-size: .82rem; color: var(--muted); }
+  .psdBlock .psdControls { margin-top: 1rem; }
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="8" width="12" height="12" rx="2.5" />
+          <path d="M10 8V5.5A2.5 2.5 0 0 1 12.5 3h6A2.5 2.5 0 0 1 21 5.5v6a2.5 2.5 0 0 1-2.5 2.5H16" />
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>Gerador de Adaptações</h1>
+        <span>IA recompõe estampas para cada tamanho — sem esticar, sem bordas vazias</span>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Seções">
+      <button class="tab active" data-view="psd">Adaptar PSD</button>
+      <button class="tab" data-view="estampas">Estampas Gocase</button>
+      <button class="tab" data-view="id">Adaptar ID</button>
+      <button class="tab" data-view="adaptar">Adaptar imagem</button>
+    </nav>
+  </div>
+</header>
+
+<div class="page">
+  <div class="layout hidden" id="view-adaptar">
+    <div class="col">
+      <div class="card">
+        <h2>1. Envie sua imagem</h2>
+        <input id="file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+        <button class="uploadBtn" id="pick">Selecionar imagem (JPG, PNG, WEBP)</button>
+        <div class="origPreview hidden" id="origWrap"><img id="orig" alt="Imagem enviada" /></div>
+      </div>
+
+      <div class="card">
+        <h2>2. Escolha os tamanhos</h2>
+        <ul class="checklist" id="checklist"></ul>
+        <div class="tipoField">
+          <span class="tipoLabel">Tipo de estampa</span>
+          <div class="tipoSeg" id="tipoImg">
+            <button type="button" class="tipoBtn active" data-tipo="localizada">Localizada</button>
+            <button type="button" class="tipoBtn" data-tipo="pattern">Pattern</button>
+          </div>
+          <p class="tipoHint" id="tipoImgHint">Arte centralizada, concentrada na região central da máscara.</p>
+        </div>
+        <button class="genBtn" id="gen" disabled>Gerar adaptações</button>
+        <p class="note" id="note"></p>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <h2>3. Resultados</h2>
+        <div class="results" id="results">
+          <p class="placeholder">Envie uma imagem e escolha ao menos um tamanho.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-estampas" class="hidden">
+    <div class="card">
+      <h2>Estampas mais vendidas (90 dias) e cobertura</h2>
+      <p class="note">Top 15 por categoria. Clique numa estampa para ver em quais produtos ela já existe (✅) e onde falta (⬜).</p>
+      <div id="estampas-body"><p class="placeholder">Carregando…</p></div>
+    </div>
+  </div>
+
+  <div id="view-id" class="hidden">
+    <div class="card">
+      <h2>Adaptar por ID</h2>
+      <p class="note">Digite o ID do produto (spree_products.id), o SKU ou o identifier do Catalog (ex: <code>lacos-flores-case</code>) para localizar a estampa e ver as adaptações.</p>
+      <div class="idbar">
+        <input id="idInput" class="amInput" placeholder="Ex.: 74826, ramos-laterais ou lacos-flores-case" />
+        <button id="idGo" class="genBtn idGoBtn" type="button">Buscar</button>
+      </div>
+      <div id="idResult"></div>
+    </div>
+  </div>
+
+  <div class="layout" id="view-psd">
+    <div class="col psdSideCol">
+      <div class="psdSideScroll">
+      <div class="card">
+        <h2>1. Envie o PSD da estampa</h2>
+        <input id="psdFile" type="file" accept=".psd,image/vnd.adobe.photoshop" class="hidden" />
+        <button class="uploadBtn" id="psdPick">Selecionar arquivo .PSD</button>
+        <p class="note">A estampa é reposicionada com <strong>fidelidade total</strong> — os elementos (camadas) são reaproveitados como estão, sem IA reinterpretar a arte.</p>
+        <div id="psdStatus" class="status hidden" style="margin-top:.75rem"></div>
+        <p class="err" id="psdErr"></p>
+      </div>
+
+      <div class="card hidden" id="psdLayersCard">
+        <h2>2. Elementos detectados</h2>
+        <p class="note">Marque quais camadas são <strong>fundo</strong> e quais são <strong>elementos</strong>. Clique na <strong>⭐</strong> para eleger o <strong>elemento principal</strong> — ele fica centralizado em destaque na estampa.</p>
+        <ul class="psdLayers" id="psdLayers"></ul>
+        <button type="button" class="psdMiniBtn" id="psdUndo" disabled style="margin-top:.75rem;width:100%">↩︎ Desfazer</button>
+      </div>
+
+      <div class="card hidden" id="psdMaskCard">
+        <h2>3. Produtos e tamanhos</h2>
+        <p class="note" style="margin-top:0">Marque um ou mais — cada produto vira um editor com seus próprios ajustes.</p>
+        <ul class="checklist" id="psdMaskList"></ul>
+      </div>
+      </div>
+    </div>
+
+    <div class="col psdEditorCol">
+      <p class="placeholder" id="psdEditorsHint">Envie um PSD e marque um ou mais tamanhos para começar.</p>
+      <div id="psdEditors"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ⭐ Presets — para adicionar um tamanho novo, basta acrescentar um objeto aqui.
+  // Tamanhos = todas as máscaras (volumetrias) dos produtos, vindas do servidor (/api/produtos).
+  let SIZES = [];
+  // Aspect ratios que o PiApp aceita (preset). Escolhemos o mais próximo de cada tamanho.
+  const ASPECTS = [
+    { name: '9:16', r: 9 / 16 }, { name: '4:5', r: 4 / 5 }, { name: '1:1', r: 1 },
+    { name: '16:9', r: 16 / 9 }, { name: '21:9', r: 21 / 9 },
+  ];
+  function nearestAspect(w, h) {
+    const r = w / h;
+    let best = ASPECTS[0], bestD = Infinity;
+    for (const a of ASPECTS) { const d = Math.abs(Math.log(r / a.r)); if (d < bestD) { bestD = d; best = a; } }
+    return best.name;
+  }
+
+  const $ = (id) => document.getElementById(id);
+  let dataUrl = null;      // imagem enviada (data URL)
+  let prep = null;         // { refUrl, desc } cacheado por upload
+
+  // monta checklist a partir dos produtos do servidor (agrupado por categoria)
+  const selected = new Set();
+  const segOf = (cat) => cat === 'Térmicos' ? 'termicos' : cat === 'Têxteis' ? 'texteis' : '';
+  function buildSizeChecklist(produtos) {
+    SIZES = [];
+    const cl = $('checklist');
+    cl.innerHTML = '';
+    for (const cat of ['Case', 'Térmicos', 'Têxteis']) {
+      const prods = produtos.filter((p) => p.cat === cat && p.masks && p.masks.length);
+      if (!prods.length) continue;
+      const h = document.createElement('li');
+      h.className = 'sizeCat';
+      h.textContent = cat;
+      cl.appendChild(h);
+      for (const p of prods) {
+        p.masks.forEach((mk, i) => {
+          const id = p.key + '#' + i;
+          const nome = p.label + (mk.vol ? ' ' + mk.vol + 'ml' : '');
+          SIZES.push({ id, name: nome, key: p.key, w: mk.w, h: mk.h, seg: segOf(cat) });
+          const li = document.createElement('li');
+          const label = document.createElement('label');
+          label.className = 'checkItem';
+          label.innerHTML =
+            `<input type="checkbox" value="${id}">` +
+            `<span class="checkName">${nome}</span><span class="checkDims">${mk.w}×${mk.h}</span>`;
+          label.querySelector('input').addEventListener('change', (e) => {
+            if (e.target.checked) selected.add(id); else selected.delete(id);
+            refreshGen();
+          });
+          li.appendChild(label);
+          cl.appendChild(li);
+        });
+      }
+    }
+    refreshGen();
+  }
+  fetch('/api/produtos').then((r) => r.json()).then((d) => buildSizeChecklist(d.produtos || []))
+    .catch(() => { $('checklist').innerHTML = '<li class="note" style="color:var(--danger)">Erro ao carregar tamanhos</li>'; });
+
+  // lê o arquivo e reduz para no máx. MAX_DIM no maior lado (JPEG) antes de enviar —
+  // a referência só serve para a IA entender os elementos; imagem menor evita
+  // estourar o limite de upload e acelera a análise. A resolução final vem da geração.
+  const MAX_DIM = 1600;
+  function fileToScaledDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('não foi possível ler o arquivo'));
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('não foi possível abrir a imagem'));
+        img.onload = () => {
+          const scale = Math.min(1, MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight));
+          const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+          const c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(c.toDataURL('image/jpeg', 0.9));
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+
+  $('pick').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try {
+      dataUrl = await fileToScaledDataUrl(f);
+      prep = null; // invalida cache de referência
+      $('orig').src = dataUrl;
+      $('origWrap').classList.remove('hidden');
+      refreshGen();
+    } catch (err) {
+      alert('Falha ao carregar a imagem: ' + err.message);
+    }
+  });
+
+  function refreshGen() {
+    const ok = !!dataUrl && selected.size > 0;
+    $('gen').disabled = !ok;
+    $('note').textContent = ok ? `${selected.size} tamanho(s) selecionado(s) — 1 geração por tamanho.` : '';
+  }
+
+  async function postJSON(path, body) {
+    let res;
+    try {
+      res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    } catch {
+      throw new Error('falha de rede ao contatar o servidor (imagem grande demais ou conexão instável)');
+    }
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    return j;
+  }
+
+  // cover-crop: desenha a imagem cobrindo WxH exatos, centralizada, e exporta PNG
+  function coverToPng(img, W, H) {
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+    const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+    ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    return canvas.toDataURL('image/png');
+  }
+
+  function loadImg(src) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error('falha ao carregar imagem'));
+      im.src = src;
+    });
+  }
+
+  // Remove o fundo SÓLIDO no próprio navegador, em resolução total (sem API, sem perda).
+  // Flood-fill a partir das bordas: só apaga o fundo contíguo às bordas, preservando
+  // elementos internos da mesma cor (ex: flor branca sobre fundo branco não some).
+  function removeBgFlood(img, W, H) {
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, W, H);
+    const id = ctx.getImageData(0, 0, W, H);
+    const d = id.data, N = W * H;
+    // cor de fundo = cor MAIS COMUM nas bordas (o fundo sólido #fff/#000 domina a borda;
+    // usar só os cantos falha quando um motivo cai num canto). Quantiza em 5 bits/canal.
+    const counts = new Map();
+    const addBorder = (i) => {
+      const p = i * 4;
+      const key = ((d[p] >> 3) << 10) | ((d[p + 1] >> 3) << 5) | (d[p + 2] >> 3);
+      const e = counts.get(key);
+      if (e) { e.n++; } else counts.set(key, { n: 1, r: d[p], g: d[p + 1], b: d[p + 2] });
+    };
+    for (let x = 0; x < W; x++) { addBorder(x); addBorder((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { addBorder(y * W); addBorder(y * W + W - 1); }
+    let best = null;
+    for (const e of counts.values()) { if (!best || e.n > best.n) best = e; }
+    const r = best.r, g = best.g, b = best.b;
+    const tol2 = 46 * 46;
+    const near = (i) => { const p = i * 4; const dr = d[p] - r, dg = d[p + 1] - g, db = d[p + 2] - b; return dr * dr + dg * dg + db * db <= tol2; };
+    const visited = new Uint8Array(N);
+    const stack = [];
+    const pushIf = (i) => { if (!visited[i]) stack.push(i); };
+    for (let x = 0; x < W; x++) { pushIf(x); pushIf((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { pushIf(y * W); pushIf(y * W + W - 1); }
+    while (stack.length) {
+      const i = stack.pop();
+      if (visited[i]) continue;
+      visited[i] = 1;
+      if (!near(i)) continue;
+      d[i * 4 + 3] = 0;
+      const x = i % W, y = (i - x) / W;
+      if (x > 0) pushIf(i - 1);
+      if (x < W - 1) pushIf(i + 1);
+      if (y > 0) pushIf(i - W);
+      if (y < H - 1) pushIf(i + W);
+    }
+    ctx.putImageData(id, 0, 0);
+    return canvas.toDataURL('image/png');
+  }
+
+  // Liga o botão "Remover fundo" a um resultado já visível (com o fundo sólido gerado).
+  // Faz a remoção no cliente (flood-fill), em resolução total. Permite alternar de volta.
+  function attachBgToggle(imgEl, dlEl, btnEl, jobId, W, H, baseName, onErr) {
+    const st = { bg: 'with', withBg: imgEl.src, noBg: null };
+    dlEl.href = st.withBg; dlEl.download = baseName + '.png';
+    btnEl.textContent = 'Remover fundo';
+    btnEl.onclick = async () => {
+      if (st.bg === 'with') {
+        if (!st.noBg) {
+          btnEl.disabled = true; btnEl.textContent = 'Removendo fundo…';
+          try {
+            const g = await loadImg(st.withBg);
+            st.noBg = removeBgFlood(g, W, H);
+          } catch (e) { btnEl.disabled = false; btnEl.textContent = 'Remover fundo'; if (onErr) onErr('Erro ao remover fundo: ' + e.message); return; }
+          btnEl.disabled = false;
+        }
+        imgEl.src = st.noBg; dlEl.href = st.noBg; dlEl.download = baseName + '-sem-fundo.png';
+        st.bg = 'no'; btnEl.textContent = 'Voltar com fundo';
+      } else {
+        imgEl.src = st.withBg; dlEl.href = st.withBg; dlEl.download = baseName + '.png';
+        st.bg = 'with'; btnEl.textContent = 'Remover fundo';
+      }
+    };
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function processPreset(preset, card) {
+    const setStatus = (html) => { card.querySelector('.status').innerHTML = html; };
+    try {
+      card.querySelector('.resultBtns').classList.add('hidden');
+      const aspect = nearestAspect(preset.w, preset.h);
+      setStatus('<span class="spinner"></span> Recompondo elementos…');
+      const { jobId } = await postJSON('/api/generate', { refUrl: prep.refUrl, desc: prep.desc, aspect, seg: preset.seg || '', tipo: estampaTipoImg });
+
+      // polling
+      let ready = false;
+      for (let i = 0; i < 60; i++) {
+        await sleep(4000);
+        const s = await (await fetch('/api/status?job=' + encodeURIComponent(jobId))).json();
+        if (s.error) throw new Error(s.error);
+        if (s.ready) { ready = true; break; }
+      }
+      if (!ready) throw new Error('tempo esgotado');
+
+      setStatus('<span class="spinner"></span> Ajustando para o tamanho exato…');
+      const gen = await loadImg('/img?job=' + encodeURIComponent(jobId));
+      const finalPng = coverToPng(gen, preset.w, preset.h);
+
+      const imgEl = card.querySelector('.resultImg');
+      imgEl.src = finalPng;
+      imgEl.style.aspectRatio = `${preset.w} / ${preset.h}`;
+      imgEl.classList.remove('hidden');
+      card.querySelector('.resultBtns').classList.remove('hidden');
+      const base = `${preset.key}-${preset.w}x${preset.h}`;
+      attachBgToggle(imgEl, card.querySelector('.dlBtn'), card.querySelector('.cardRemoveBg'), jobId, preset.w, preset.h, base, (m) => setStatus(`<span class="err">${m}</span>`));
+      setStatus('✅ Pronto');
+    } catch (e) {
+      setStatus(`<span class="err">Erro: ${e.message}</span>`);
+    }
+  }
+
+  $('gen').addEventListener('click', async () => {
+    if (!dataUrl || selected.size === 0) return;
+    $('gen').disabled = true;
+    const chosen = SIZES.filter((p) => selected.has(p.id));
+
+    // monta os cards
+    const results = $('results');
+    results.innerHTML = '';
+    const cards = {};
+    for (const p of chosen) {
+      const card = document.createElement('div');
+      card.className = 'resultCard';
+      card.innerHTML =
+        `<div class="resultHead"><strong>${p.name}</strong><span class="dims">${p.w}×${p.h}px</span></div>` +
+        `<img class="resultImg hidden" alt="${p.name}">` +
+        `<div class="status"><span class="spinner"></span> Na fila…</div>` +
+        `<div class="resultBtns hidden" style="display:flex; gap:.5rem; flex-wrap:wrap">` +
+          `<a class="dlBtn" href="#">Baixar PNG</a>` +
+          `<button type="button" class="cardRemoveBg iconBtn" style="width:auto; padding:0 .7rem">Remover fundo</button>` +
+          `<button type="button" class="cardRegen iconBtn" style="width:auto; padding:0 .7rem">Gerar nova versão</button>` +
+        `</div>`;
+      card._preset = p;
+      card.querySelector('.cardRegen').addEventListener('click', () => processPreset(card._preset, card));
+      results.appendChild(card);
+      cards[p.id] = card;
+    }
+
+    try {
+      // prepara referência + descrição uma única vez
+      if (!prep) {
+        for (const p of chosen) cards[p.id].querySelector('.status').innerHTML =
+          '<span class="spinner"></span> Analisando imagem…';
+        prep = await postJSON('/api/prepare', { imageBase64: dataUrl });
+      }
+      // processa todos os presets em paralelo
+      await Promise.all(chosen.map((p) => processPreset(p, cards[p.id])));
+    } catch (e) {
+      results.insertAdjacentHTML('afterbegin', `<div class="banner">${e.message}</div>`);
+    } finally {
+      $('gen').disabled = false;
+    }
+  });
+  // ---- Seletor "tipo de estampa" (Localizada / Pattern) ----
+  function wireTipo(segId, onChange) {
+    const seg = document.getElementById(segId);
+    if (!seg) return;
+    seg.querySelectorAll('.tipoBtn').forEach((b) => b.addEventListener('click', () => {
+      seg.querySelectorAll('.tipoBtn').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      onChange(b.dataset.tipo);
+    }));
+  }
+  let estampaTipoImg = 'localizada';
+  wireTipo('tipoImg', (tipo) => {
+    estampaTipoImg = tipo;
+    $('tipoImgHint').textContent = tipo === 'pattern'
+      ? 'Padrão corrido: motivos repetidos preenchendo a máscara, sem emenda nas bordas.'
+      : 'Arte centralizada, concentrada na região central da máscara.';
+  });
+
+  // ---- Abas ----
+  document.querySelectorAll('.tabs .tab').forEach((t) => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tabs .tab').forEach((x) => x.classList.remove('active'));
+      t.classList.add('active');
+      const view = t.dataset.view;
+      document.getElementById('view-adaptar').classList.toggle('hidden', view !== 'adaptar');
+      document.getElementById('view-estampas').classList.toggle('hidden', view !== 'estampas');
+      document.getElementById('view-id').classList.toggle('hidden', view !== 'id');
+      document.getElementById('view-psd').classList.toggle('hidden', view !== 'psd');
+      if (view === 'estampas' && !estampasLoaded) loadEstampas();
+      if (view === 'psd') ensurePsdMaskOptions();
+    });
+  });
+
+  // ---- Estampas Gocase ----
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  let estampasLoaded = false;
+
+  const SUBCATS = ['Capinha', 'Garrafa Fresh', 'Tote Daily'];
+  const catCache = {};
+
+  const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>';
+  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  // URL de busca da estampa no site (padrão fornecido pela Gocase).
+  function siteSearchUrl(design) {
+    return 'https://www.gocase.com.br/search?q=' + encodeURIComponent(design.trim().toLowerCase()) +
+      '&searchSkipSmartRedirect=false&enableCatalogFacetsSearch=false';
+  }
+
+  function loadEstampas() {
+    if (estampasLoaded) return;
+    estampasLoaded = true;
+    const body = document.getElementById('estampas-body');
+    body.innerHTML =
+      '<div class="subtabs">' +
+      SUBCATS.map((c, i) => `<button class="subtab${i === 0 ? ' active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('') +
+      '</div><div id="est-cat-body"></div>';
+    body.querySelectorAll('.subtab').forEach((b) => {
+      b.addEventListener('click', () => {
+        body.querySelectorAll('.subtab').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        loadCat(b.dataset.cat);
+      });
+    });
+    loadCat(SUBCATS[0]);
+  }
+
+  async function loadCat(cat) {
+    const target = document.getElementById('est-cat-body');
+    if (catCache[cat]) { renderCatItems(target, catCache[cat]); return; }
+    target.innerHTML = '<p class="placeholder">Carregando vendas dos últimos 90 dias…</p>';
+    try {
+      const res = await fetch('/api/estampas/top?dias=90&cat=' + encodeURIComponent(cat));
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || ('HTTP ' + res.status));
+      catCache[cat] = j;
+      renderCatItems(target, j);
+    } catch (err) {
+      target.innerHTML = `<div class="banner">Erro ao carregar: ${esc(err.message)}</div>`;
+    }
+  }
+
+  function createEstampaItem(e, rank, total) {
+    const done = e.nFalta === 0;
+    const pct = Math.round((e.nPresente / (e.nPresente + e.nFalta || 1)) * 100);
+    const item = document.createElement('div');
+    item.className = 'estItem' + (done ? ' done' : '');
+    item.innerHTML =
+      `<div class="estHead"><span class="estRank">${rank}</span>` +
+      `<span class="estNameWrap"><span class="estName">${esc(e.design)}</span>` +
+        `<span class="estActions">` +
+          `<button class="iconBtn js-copy" title="Copiar nome" aria-label="Copiar nome">${ICON_COPY}</button>` +
+          `<a class="iconBtn" title="Abrir busca no site" aria-label="Abrir busca no site" target="_blank" rel="noopener" href="${esc(siteSearchUrl(e.design))}">${ICON_LINK}</a>` +
+        `</span>` +
+      `</span>` +
+      `<span class="estCov">` +
+        `<span class="covBar"><span class="covFill" style="width:${pct}%"></span></span>` +
+        `<span class="covTxt">${done ? '100% adaptada' : `<b>${e.nPresente}</b>/${total} · faltam ${e.nFalta}`}</span>` +
+      `</span>` +
+      `<span class="estSales">${Number(e.unidades).toLocaleString('pt-BR')} un</span>` +
+      `<span class="estChevron">›</span></div>` +
+      `<div class="estBody hidden"></div>`;
+    const head = item.querySelector('.estHead');
+    const bodyEl = item.querySelector('.estBody');
+    head.addEventListener('click', () => toggleCoverage(item, bodyEl, e.design, e.checklist));
+    const actions = item.querySelector('.estActions');
+    actions.addEventListener('click', (ev) => ev.stopPropagation());
+    const copyBtn = actions.querySelector('.js-copy');
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(e.design);
+        copyBtn.classList.add('ok'); copyBtn.innerHTML = ICON_CHECK; copyBtn.title = 'Copiado!';
+        setTimeout(() => { copyBtn.classList.remove('ok'); copyBtn.innerHTML = ICON_COPY; copyBtn.title = 'Copiar nome'; }, 1200);
+      } catch { copyBtn.title = 'Não foi possível copiar'; }
+    });
+    return item;
+  }
+
+  function renderCatItems(target, j) {
+    target.innerHTML = '';
+    if (!j.estampas.length) { target.innerHTML = '<p class="placeholder">Sem dados no período.</p>'; return; }
+    const total = j.totalProdutos;
+    const pendentes = [], concluidos = [];
+    j.estampas.forEach((e, i) => (e.nFalta === 0 ? concluidos : pendentes).push({ e, rank: i + 1 }));
+
+    if (!pendentes.length) target.innerHTML = '<p class="placeholder">Tudo adaptado nesta categoria. 🎉</p>';
+    pendentes.forEach(({ e, rank }) => target.appendChild(createEstampaItem(e, rank, total)));
+
+    if (concluidos.length) {
+      const h = document.createElement('h3');
+      h.className = 'doneHeader';
+      h.innerHTML = `${ICON_CHECK}<span>Concluídos — 100% adaptados (${concluidos.length})</span>`;
+      target.appendChild(h);
+      concluidos.forEach(({ e, rank }) => target.appendChild(createEstampaItem(e, rank, total)));
+    }
+  }
+
+  function toggleCoverage(item, bodyEl, design, checklist) {
+    const open = item.classList.toggle('open');
+    bodyEl.classList.toggle('hidden', !open);
+    if (!open || bodyEl.dataset.loaded) return;
+    bodyEl.dataset.loaded = '1';
+    renderCoverage(bodyEl, design, checklist);
+  }
+
+  function renderCoverage(bodyEl, design, checklist, preRef) {
+    bodyEl.innerHTML = '';
+    for (const cat of ['Case', 'Térmicos', 'Têxteis']) {
+      const items = checklist.filter((x) => x.cat === cat);
+      if (!items.length) continue;
+      const g = document.createElement('div');
+      g.className = 'covGroup';
+      g.innerHTML = `<h4>${esc(cat)}</h4>`;
+      const list = document.createElement('div');
+      list.className = 'covList';
+      for (const x of items) {
+        const el = document.createElement('div');
+        el.className = 'covItem ' + (x.presente ? 'has' : 'miss');
+        let html = `<span class="mark">${x.presente ? '✅' : '⬜'}</span><span>${esc(x.label)}</span>`;
+        if (!x.presente) {
+          const dis = x.adaptavel ? '' : 'disabled title="Dimensão ainda não cadastrada"';
+          html += `<button class="adaptBtn" ${dis} data-design="${esc(design)}" data-prod="${esc(x.key)}">Adaptar</button>`;
+        }
+        el.innerHTML = html;
+        list.appendChild(el);
+      }
+      g.appendChild(list);
+      bodyEl.appendChild(g);
+    }
+    const panel = buildAdaptPanel();
+    bodyEl.appendChild(panel);
+    bodyEl.querySelectorAll('.adaptBtn:not([disabled])').forEach((b) => {
+      b.addEventListener('click', () => {
+        const prod = checklist.find((p) => p.key === b.dataset.prod);
+        openAdaptPanel(panel, design, prod, preRef);
+      });
+    });
+  }
+  // ---- Painel Adaptar inline (Estágio 2) ----
+  function buildAdaptPanel() {
+    const p = document.createElement('div');
+    p.className = 'adaptPanel';
+    p.innerHTML =
+      '<div class="apHead"><strong class="apTitle"></strong>' +
+      '<button type="button" class="iconBtn apClose" title="Fechar" aria-label="Fechar">✕</button></div>' +
+      '<div class="apProgress amProgress hidden"><span class="spinner"></span><span class="apStatus"></span></div>' +
+      '<div class="apManual hidden">' +
+        '<p class="note">Não encontrei a arte automaticamente. Cole a URL da imagem da estampa:</p>' +
+        '<input type="url" class="apUrl amInput" placeholder="URL da imagem da estampa">' +
+        '<button type="button" class="apManualGo genBtn" style="margin-top:.6rem">Gerar com esta URL</button>' +
+      '</div>' +
+      '<div class="apResults" style="display:flex; flex-direction:column; gap:1rem"></div>' +
+      '<p class="apErr err"></p>';
+    const q = (c) => p.querySelector(c);
+    q('.apClose').addEventListener('click', () => p.classList.remove('open'));
+    q('.apManualGo').addEventListener('click', () => {
+      const u = q('.apUrl').value.trim();
+      if (!u) { q('.apErr').textContent = 'Cole uma URL.'; return; }
+      p._refUrl = u; q('.apManual').classList.add('hidden'); q('.apErr').textContent = ''; renderMaskCards(p);
+    });
+    return p;
+  }
+
+  function openAdaptPanel(p, design, prod, preRef) {
+    if (!prod || !prod.masks || !prod.masks.length) return;
+    const q = (c) => p.querySelector(c);
+    p._design = design; p._prod = prod; p._refUrl = null; p._preRef = preRef || null;
+    const nm = prod.masks.length;
+    q('.apTitle').textContent = `Adaptar "${design}" → ${prod.label}` +
+      (nm > 1 ? ` (${nm} volumetrias)` : ` (${prod.masks[0].w}×${prod.masks[0].h})`);
+    q('.apErr').textContent = '';
+    q('.apManual').classList.add('hidden');
+    q('.apResults').innerHTML = '';
+    q('.apProgress').classList.remove('hidden');
+    q('.apStatus').textContent = 'Buscando a arte da estampa…';
+    p.classList.add('open');
+    p.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    startAdapt(p);
+  }
+
+  // Busca a arte da estampa (Prisma render, via banco). Se não achar, mostra fallback de URL.
+  async function startAdapt(p) {
+    const q = (c) => p.querySelector(c);
+    // Se já veio uma arte de referência resolvida (ex: identifier do Catalog), usa direto.
+    if (p._preRef) {
+      p._refUrl = p._preRef;
+      q('.apProgress').classList.add('hidden');
+      renderMaskCards(p);
+      return;
+    }
+    try {
+      const r = await fetch('/api/estampas/refimg?e=' + encodeURIComponent(p._design));
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.refUrl) {
+        q('.apProgress').classList.add('hidden');
+        q('.apManual').classList.remove('hidden');
+        q('.apErr').textContent = d.error || 'Arte não encontrada automaticamente.';
+        return;
+      }
+      p._refUrl = d.refUrl;
+      q('.apProgress').classList.add('hidden');
+      renderMaskCards(p);
+    } catch (e) {
+      q('.apProgress').classList.add('hidden');
+      q('.apManual').classList.remove('hidden');
+      q('.apErr').textContent = 'Erro ao buscar a arte: ' + e.message;
+    }
+  }
+
+  // Um card de resultado por máscara (volumetria); todas geram a partir da mesma referência.
+  function renderMaskCards(p) {
+    const results = p.querySelector('.apResults');
+    results.innerHTML = '';
+    p._prod.masks.forEach((mask) => {
+      const card = document.createElement('div');
+      card.className = 'apMaskCard';
+      card.style.cssText = 'border:1px solid var(--border); border-radius:10px; padding:.75rem; background:#fff';
+      card.innerHTML =
+        `<div style="font-weight:600; font-size:.85rem; margin-bottom:.5rem">${mask.vol ? 'Volumetria ' + mask.vol + 'ml · ' : 'Máscara '}${mask.w}×${mask.h}px</div>` +
+        '<div class="mkProgress amProgress"><span class="spinner"></span><span class="mkStatus"></span></div>' +
+        '<img class="mkImg resultImg hidden" alt="">' +
+        '<div class="mkBtns hidden" style="margin-top:.6rem; display:flex; gap:.5rem; flex-wrap:wrap">' +
+          '<a class="mkDl dlBtn" style="display:inline-block">Baixar PNG</a>' +
+          '<button type="button" class="mkRemoveBg iconBtn" style="width:auto;padding:0 .7rem">Remover fundo</button>' +
+          '<button type="button" class="mkRegen iconBtn" style="width:auto;padding:0 .7rem">Gerar nova versão</button>' +
+        '</div>' +
+        '<p class="mkErr err"></p>';
+      results.appendChild(card);
+      card.querySelector('.mkRegen').addEventListener('click', () => runMask(p, card, mask));
+      runMask(p, card, mask);
+    });
+  }
+
+  async function runMask(p, card, mask) {
+    const qc = (c) => card.querySelector(c);
+    const design = p._design, prod = p._prod, refUrl = p._refUrl;
+    qc('.mkErr').textContent = '';
+    qc('.mkImg').classList.add('hidden'); qc('.mkBtns').classList.add('hidden'); qc('.mkProgress').classList.remove('hidden');
+    const setStatus = (t) => { qc('.mkStatus').textContent = t; };
+    try {
+      setStatus('Recompondo…');
+      const aspect = nearestAspect(mask.w, mask.h);
+      const seg = prod.cat === 'Térmicos' ? 'termicos' : prod.cat === 'Têxteis' ? 'texteis' : '';
+      const { jobId } = await postJSON('/api/generate', { refUrl, aspect, desc: '', seg });
+      let ready = false;
+      for (let i = 0; i < 60; i++) {
+        await sleep(4000);
+        const s = await (await fetch('/api/status?job=' + encodeURIComponent(jobId))).json();
+        if (s.error) throw new Error(s.error);
+        if (s.ready) { ready = true; break; }
+      }
+      if (!ready) throw new Error('tempo esgotado');
+      setStatus('Ajustando ao tamanho…');
+      const gen = await loadImg('/img?job=' + encodeURIComponent(jobId));
+      const finalPng = coverToPng(gen, mask.w, mask.h);
+      qc('.mkProgress').classList.add('hidden'); qc('.mkImg').classList.remove('hidden'); qc('.mkBtns').classList.remove('hidden');
+      const img = qc('.mkImg'); img.src = finalPng; img.style.aspectRatio = `${mask.w} / ${mask.h}`;
+      const base = `${design}-${prod.key}-${mask.w}x${mask.h}`.replace(/\s+/g, '_').toLowerCase();
+      attachBgToggle(img, qc('.mkDl'), qc('.mkRemoveBg'), jobId, mask.w, mask.h, base, (msg) => { qc('.mkErr').textContent = msg; });
+    } catch (e) {
+      qc('.mkProgress').classList.add('hidden');
+      qc('.mkErr').textContent = 'Erro: ' + e.message;
+    }
+  }
+
+  // Adaptar PSD é a aba principal — prepara as opções de máscara ao abrir. Adiado (setTimeout 0) porque
+  // esta linha roda ANTES das declarações `let` da seção PSD (psdMaskReady/PSD_MASKS) — sem o defer,
+  // acessá-las aqui cairia na TDZ. O ensure faz retry do fetch; o select também é populado no upload.
+  setTimeout(ensurePsdMaskOptions, 0);
+
+  // ---- Adaptar por ID ----
+  function idBuscar() {
+    const id = document.getElementById('idInput').value.trim();
+    const out = document.getElementById('idResult');
+    if (!id) { out.innerHTML = '<div class="banner">Digite um ID ou SKU.</div>'; return; }
+    out.innerHTML = '<p class="placeholder"><span class="spinner"></span> Buscando…</p>';
+    fetch('/api/estampas/byid?id=' + encodeURIComponent(id))
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok) { out.innerHTML = `<div class="banner">${esc(d.error || 'Erro')}</div>`; return; }
+        out.innerHTML =
+          '<div class="idInfo">' +
+            `<div><span class="idLabel">Produto</span><strong>${esc(d.produto)}</strong></div>` +
+            `<div><span class="idLabel">Estampa</span><strong>${esc(d.design)}</strong></div>` +
+            `<div><span class="idLabel">Tipo</span>${esc(d.tipo)} <span class="idLabel" style="margin-left:.5rem">ID</span>${esc(String(d.id))}` +
+              (d.link ? ` · <a class="src" style="color:var(--primary)" href="${esc(d.link)}" target="_blank" rel="noopener">abrir no site ↗</a>` : '') +
+            '</div>' +
+          '</div>' +
+          (d.source === 'catalog' ? '<p class="note" style="margin-top:.6rem">🎨 Identifier do Catalog — referência puxada do preview do Prisma.</p>' : '') +
+          '<h3 class="idCovTitle">Adaptações</h3>' +
+          '<div id="idCoverage" class="estBody" style="display:block; border:0; background:transparent; padding:0"></div>';
+        renderCoverage(document.getElementById('idCoverage'), d.design, d.checklist, d.refUrl);
+      })
+      .catch((e) => { out.innerHTML = `<div class="banner">Erro de rede: ${esc(e.message)}</div>`; });
+  }
+  document.getElementById('idGo').addEventListener('click', idBuscar);
+  document.getElementById('idInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') idBuscar(); });
+
+  // ================= Adaptar PSD (100% fiel, sem IA) =================
+  // Lê o PSD no navegador (ag-psd), separa as camadas em "fundo" (fixo) e
+  // "elementos" (móveis) e monta uma composição no tamanho exato da máscara.
+  // A arte NÃO é reinterpretada: cada camada é reaproveitada pixel a pixel.
+  let PSD = null;         // { pw, ph, elements: [{name,canvas,ox,oy,ow,oh,isBg,visible,dispSrc,node,t}] }
+  let psdHistory = [];    // pilha de operações (separar/abrir pasta) p/ "Desfazer" — {original, children[]}
+  let PSD_MASKS = [];     // todas as máscaras (uma por produto/volumetria)
+  let psdMaskReady = false;
+  // Cada produto marcado vira um "editor" independente (bloco com prévia + próprios controles).
+  let editors = [];       // { maskIdx, S:{tipo,bgMode,rapport,arrangeMode,overlap,cols}, dom, canvas }
+  const isSpanning = (e) => !!PSD && e.ow >= PSD.pw * 0.85 && e.oh >= PSD.ph * 0.85;  // camada ~full-canvas
+
+  // Carrega o leitor de PSD sob demanda (bundle grande — só quando precisa).
+  let agPsdLoad = null;
+  function loadAgPsd() {
+    if (window.agPsd) return Promise.resolve(window.agPsd);
+    if (agPsdLoad) return agPsdLoad;
+    agPsdLoad = new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = '/vendor/ag-psd.js';
+      s.onload = () => window.agPsd ? res(window.agPsd) : rej(new Error('leitor de PSD não inicializou'));
+      s.onerror = () => rej(new Error('falha ao baixar o leitor de PSD'));
+      document.head.appendChild(s);
+    });
+    return agPsdLoad;
+  }
+
+  // Monta o <select> de máscaras a partir do registro de produtos (uma vez). Faz retry do fetch
+  // (o proxy do preview às vezes recusa /api nos primeiros segundos) e só marca "pronto" no sucesso.
+  async function ensurePsdMaskOptions() {
+    if (psdMaskReady) return;
+    let produtos = null;
+    for (let attempt = 0; attempt < 8 && produtos === null; attempt++) {
+      try { produtos = (await (await fetch('/api/produtos')).json()).produtos || []; }
+      catch { await new Promise((r) => setTimeout(r, 400)); }
+    }
+    if (produtos === null) return;   // não marca ready → tenta de novo depois (ex: no upload do PSD)
+    psdMaskReady = true;
+    PSD_MASKS = [];
+    const list = $('psdMaskList');
+    list.innerHTML = '';
+    for (const cat of ['Térmicos', 'Têxteis', 'Case']) {
+      const prods = produtos.filter((p) => p.cat === cat && p.masks && p.masks.length);
+      if (!prods.length) continue;
+      const hd = document.createElement('li'); hd.className = 'sizeCat'; hd.textContent = cat; list.appendChild(hd);
+      for (const p of prods) {
+        p.masks.forEach((mk) => {
+          const idx = PSD_MASKS.length;
+          const nome = p.label + (mk.vol ? ' ' + mk.vol + 'ml' : '');
+          PSD_MASKS.push({ label: nome, key: p.key, cat, w: mk.w, h: mk.h, seg: segOf(cat) });
+          const li = document.createElement('li');
+          const label = document.createElement('label'); label.className = 'checkItem';
+          label.innerHTML = `<input type="checkbox" value="${idx}"><span class="checkName">${nome}</span><span class="checkDims">${mk.w}×${mk.h}</span>`;
+          label.querySelector('input').addEventListener('change', (ev) => {
+            const i = Number(ev.target.value);
+            if (ev.target.checked) addEditor(i); else removeEditor(i);
+          });
+          li.appendChild(label); list.appendChild(li);
+        });
+      }
+    }
+  }
+
+  const psdShowErr = (m) => { $('psdErr').textContent = m || ''; };
+  function psdSetStatus(html) {
+    const el = $('psdStatus');
+    if (html) { el.classList.remove('hidden'); el.innerHTML = html; } else el.classList.add('hidden');
+  }
+
+  $('psdPick').addEventListener('click', () => $('psdFile').click());
+  $('psdFile').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    psdShowErr('');
+    psdSetStatus('<span class="spinner"></span> Lendo camadas do PSD…');
+    try {
+      const agPsd = await loadAgPsd();
+      const buf = await f.arrayBuffer();
+      const psd = agPsd.readPsd(buf, { useImageData: false, skipLinkedFilesData: true, skipThumbnail: true });
+      parsePsd(psd);
+      psdSetStatus(`✅ ${PSD.elements.length} camada(s) · canvas ${PSD.pw}×${PSD.ph}`);
+      renderPsdLayers();
+      $('psdLayersCard').classList.remove('hidden');
+      $('psdMaskCard').classList.remove('hidden');
+      await ensurePsdMaskOptions();
+      // marca o 1º tamanho por padrão p/ já mostrar um editor
+      editors = []; $('psdEditors').innerHTML = '';
+      const firstCb = $('psdMaskList').querySelector('input[type=checkbox]');
+      if (firstCb) { firstCb.checked = true; addEditor(Number(firstCb.value)); }
+      updateEditorsHint();
+    } catch (err) {
+      psdSetStatus('');
+      psdShowErr('Não consegui ler o PSD: ' + err.message);
+    }
+  });
+
+  // Junta as folhas (camadas raster) de um grupo num único canvas no bbox do grupo.
+  function collectLeaves(node, out) {
+    if (node.children && node.children.length) {
+      for (const c of node.children) { if (c.hidden) continue; collectLeaves(c, out); }
+    } else if (node.canvas && node.canvas.width && node.canvas.height) out.push(node);
+  }
+  function rasterizeGroup(node) {
+    const leaves = []; collectLeaves(node, leaves);
+    if (!leaves.length) return null;
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    for (const lf of leaves) { l = Math.min(l, lf.left); t = Math.min(t, lf.top); r = Math.max(r, lf.right); b = Math.max(b, lf.bottom); }
+    const w = Math.round(r - l), h = Math.round(b - t);
+    if (w < 1 || h < 1) return null;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const cx = cv.getContext('2d');
+    for (const lf of leaves) cx.drawImage(lf.canvas, Math.round(lf.left - l), Math.round(lf.top - t));
+    return { canvas: cv, left: l, top: t };
+  }
+
+  // Fração de pixels opacos (amostra pequena) — usada para distinguir fundo de motivo.
+  function opaqueFraction(cv) {
+    const M = 48, r = Math.min(1, M / Math.max(cv.width, cv.height));
+    const s = document.createElement('canvas');
+    s.width = Math.max(1, Math.round(cv.width * r)); s.height = Math.max(1, Math.round(cv.height * r));
+    const cx = s.getContext('2d', { willReadFrequently: true }); cx.drawImage(cv, 0, 0, s.width, s.height);
+    const d = cx.getImageData(0, 0, s.width, s.height).data;
+    let op = 0; const n = s.width * s.height;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 240) op++;
+    return op / n;
+  }
+  function toDisp(cv, max) {
+    const r = Math.min(1, max / Math.max(cv.width, cv.height));
+    if (r >= 1) return cv.toDataURL('image/png');
+    const s = document.createElement('canvas');
+    s.width = Math.round(cv.width * r); s.height = Math.round(cv.height * r);
+    s.getContext('2d').drawImage(cv, 0, 0, s.width, s.height);
+    return s.toDataURL('image/png');
+  }
+
+  // Cor de fundo REAL amostrada do composite (psd.canvas já inclui efeitos/blend das camadas,
+  // ex: um Color Overlay que deixa o "Fundo" amarelo — que a camada crua não tem). Moda das
+  // bordas; retorna null se a borda for majoritariamente transparente (estampa sem fundo).
+  function sampleBgColor(cv) {
+    if (!cv) return null;
+    const M = 64, r = Math.min(1, M / Math.max(cv.width, cv.height));
+    const s = document.createElement('canvas');
+    s.width = Math.max(2, Math.round(cv.width * r)); s.height = Math.max(2, Math.round(cv.height * r));
+    const cx = s.getContext('2d', { willReadFrequently: true }); cx.drawImage(cv, 0, 0, s.width, s.height);
+    const W = s.width, H = s.height, d = cx.getImageData(0, 0, W, H).data;
+    const counts = new Map(); let opaque = 0, total = 0;
+    const add = (i) => { const p = i * 4; total++; if (d[p + 3] < 128) return; opaque++;
+      const key = ((d[p] >> 3) << 10) | ((d[p + 1] >> 3) << 5) | (d[p + 2] >> 3);
+      const e = counts.get(key); if (e) e.n++; else counts.set(key, { n: 1, r: d[p], g: d[p + 1], b: d[p + 2] }); };
+    for (let x = 0; x < W; x++) { add(x); add((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { add(y * W); add(y * W + W - 1); }
+    if (opaque < total * 0.5) return null; // borda majoritariamente transparente → sem fundo
+    let best = null; for (const e of counts.values()) if (!best || e.n > best.n) best = e;
+    return best ? `rgb(${best.r},${best.g},${best.b})` : null;
+  }
+
+  // Converte um nó do PSD (camada ou PASTA/grupo) num elemento do editor.
+  // Pasta → rasteriza o conjunto num elemento só, mas guarda os filhos (`kids`) p/ poder "abrir".
+  function nodeToElement(node, pw, ph) {
+    const isFolder = !!(node.children && node.children.length);
+    let ras = null;
+    if (isFolder) ras = rasterizeGroup(node);
+    else if (node.canvas && node.canvas.width && node.canvas.height) ras = { canvas: node.canvas, left: node.left, top: node.top };
+    if (!ras) return null;
+    const cv = ras.canvas;
+    const isBg = cv.width >= pw * 0.9 && cv.height >= ph * 0.9 && opaqueFraction(cv) >= 0.8;
+    return {
+      name: node.name || 'camada', canvas: cv, ox: ras.left, oy: ras.top, ow: cv.width, oh: cv.height,
+      isBg, visible: true, dispSrc: toDisp(cv, 700), t: null, group: '',
+      isFolder, kids: isFolder ? node.children.filter((c) => !c.hidden) : null,
+    };
+  }
+
+  function parsePsd(psd) {
+    const pw = psd.width, ph = psd.height;
+    const elements = [];
+    // children[0] = camada de baixo → desenha na ordem do array (fundo → topo).
+    for (const node of (psd.children || [])) {
+      if (node.hidden) continue;
+      const el = nodeToElement(node, pw, ph);
+      if (el) elements.push(el);
+    }
+    PSD = { pw, ph, elements, bgColor: sampleBgColor(psd.canvas), starEl: null };
+    psdHistory = [];
+  }
+
+  // Registra uma operação de separar/abrir pasta para poder desfazer (juntar de novo).
+  function pushHistory(original, children) {
+    psdHistory.push({ original, children: children.slice(), label: original.name });
+    updateUndoBtn();
+  }
+  function updateUndoBtn() {
+    const b = document.getElementById('psdUndo');
+    if (!b) return;
+    b.disabled = psdHistory.length === 0;
+    b.textContent = psdHistory.length ? `↩︎ Desfazer “${psdHistory[psdHistory.length - 1].label}” (${psdHistory.length})` : '↩︎ Desfazer';
+  }
+  // Desfaz a última separação/abertura: remove os filhos e recoloca o elemento original na mesma posição z.
+  function undoLastSplit() {
+    if (!PSD || !psdHistory.length) return;
+    const op = psdHistory.pop();
+    const set = new Set(op.children);
+    let insertAt = 0, seen = false;
+    const kept = [];
+    for (const e of PSD.elements) {
+      if (set.has(e)) { if (!seen) { insertAt = kept.length; seen = true; } }
+      else kept.push(e);
+    }
+    if (!seen) insertAt = kept.length;        // filhos já não estão (foram re-divididos) — insere no fim
+    kept.splice(insertAt, 0, op.original);
+    PSD.elements = kept;
+    renderPsdLayers(); refreshAllBlocks(); updateUndoBtn();
+  }
+  $('psdUndo').addEventListener('click', undoLastSplit);   // (o listener havia sumido no refactor dos blocos)
+
+  // "Abre" uma pasta: troca o elemento-pasta pelos seus filhos, como elementos independentes,
+  // PRESERVANDO a posição/escala visual atual (nada se move ao abrir). Pastas aninhadas viram
+  // sub-pastas abríveis de novo. Um filho que cobre a pasta pode ser marcado fundo normalmente.
+  function expandFolder(el) {
+    if (!PSD || !el.isFolder || !el.kids || !el.kids.length) return;
+    const idx = PSD.elements.indexOf(el);
+    if (idx < 0) return;
+    const scale = (el.t && el.ow) ? el.t.w / el.ow : null;   // escala uniforme aplicada à pasta
+    const kids = el.kids.map((k) => nodeToElement(k, PSD.pw, PSD.ph)).filter(Boolean);
+    kids.forEach((k) => {
+      k.group = (el.group ? el.group + ' / ' : '') + el.name;
+      k.visible = el.visible;
+      if (scale != null) k.t = { x: el.t.x + (k.ox - el.ox) * scale, y: el.t.y + (k.oy - el.oy) * scale, w: k.ow * scale, h: k.oh * scale };
+    });
+    PSD.elements.splice(idx, 1, ...kids);
+    pushHistory(el, kids);
+    renderPsdLayers();
+    refreshAllBlocks();
+  }
+
+  // Dilata a máscara binária (separável, r passos) p/ juntar motivos com pequenos vãos.
+  function dilate(bin, W, H, r) {
+    let a = bin;
+    for (let pass = 0; pass < r; pass++) {
+      const b = new Uint8Array(a.length);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (a[i] || (x > 0 && a[i - 1]) || (x < W - 1 && a[i + 1]) || (y > 0 && a[i - W]) || (y < H - 1 && a[i + W])) b[i] = 1;
+      }
+      a = b;
+    }
+    return a;
+  }
+  // Rotula componentes conexos (8-vizinhos) numa máscara binária. Retorna bboxes + mapa de rótulos.
+  function connectedComponents(bin, W, H) {
+    const labels = new Int32Array(W * H);
+    const comps = []; const stack = []; let cur = 0;
+    for (let i = 0; i < bin.length; i++) {
+      if (!bin[i] || labels[i]) continue;
+      cur++; let minx = W, miny = H, maxx = 0, maxy = 0, area = 0;
+      stack.push(i); labels[i] = cur;
+      while (stack.length) {
+        const p = stack.pop(), x = p % W, y = (p - x) / W; area++;
+        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
+        const t = (np) => { if (bin[np] && !labels[np]) { labels[np] = cur; stack.push(np); } };
+        if (x > 0) t(p - 1); if (x < W - 1) t(p + 1); if (y > 0) t(p - W); if (y < H - 1) t(p + W);
+        if (x > 0 && y > 0) t(p - W - 1); if (x < W - 1 && y > 0) t(p - W + 1);
+        if (x > 0 && y < H - 1) t(p + W - 1); if (x < W - 1 && y < H - 1) t(p + W + 1);
+      }
+      comps.push({ minx, miny, maxx, maxy, area, label: cur });
+    }
+    return { comps, labels };
+  }
+
+  // Separa motivos que estão JUNTOS numa mesma camada (ilhas de pixels opacos separadas por
+  // transparência). Rotula em baixa resolução (rápido), recorta cada ilha do canvas em resolução
+  // TOTAL e mascara pelo rótulo (remove vazamento de vizinhos). Preserva a posição visual atual.
+  function splitLayer(el) {
+    if (!PSD || el.isFolder) return;
+    const src = el.canvas;
+    const scale = Math.min(1, 460 / Math.max(src.width, src.height));
+    const W2 = Math.max(1, Math.round(src.width * scale)), H2 = Math.max(1, Math.round(src.height * scale));
+    const s = document.createElement('canvas'); s.width = W2; s.height = H2;
+    const cx = s.getContext('2d', { willReadFrequently: true }); cx.drawImage(src, 0, 0, W2, H2);
+    const d = cx.getImageData(0, 0, W2, H2).data;
+    let bin = new Uint8Array(W2 * H2);
+    for (let i = 0, p = 3; i < bin.length; i++, p += 4) bin[i] = d[p] > 40 ? 1 : 0;
+    const r = Math.max(1, Math.round(Math.max(W2, H2) * 0.012));   // junta partes com vãos pequenos
+    const { comps, labels } = connectedComponents(dilate(bin, W2, H2, r), W2, H2);
+    const minArea = W2 * H2 * 0.0006;                              // descarta ruído/aparas
+    const parts = comps.filter((c) => c.area >= minArea).sort((a, b) => a.minx - b.minx);
+    if (parts.length < 2) { alert('Não encontrei motivos separados nesta camada (o conteúdo é contíguo). O recurso separa desenhos que têm espaço transparente entre eles.'); return; }
+    const sX = src.width / W2, sY = src.height / H2;
+    const scaleT = (el.t && el.ow) ? el.t.w / el.ow : null;
+    const newEls = parts.map((c, k) => {
+      const x0 = Math.max(0, Math.floor(c.minx * sX)), y0 = Math.max(0, Math.floor(c.miny * sY));
+      const x1 = Math.min(src.width, Math.ceil((c.maxx + 1) * sX)), y1 = Math.min(src.height, Math.ceil((c.maxy + 1) * sY));
+      const cw = x1 - x0, ch = y1 - y0;
+      const cc = document.createElement('canvas'); cc.width = cw; cc.height = ch;
+      const ccx = cc.getContext('2d', { willReadFrequently: true });
+      ccx.drawImage(src, x0, y0, cw, ch, 0, 0, cw, ch);
+      // mascara: mantém só os pixels cujo rótulo (na baixa-res) é o desta ilha → sem vizinho
+      const id = ccx.getImageData(0, 0, cw, ch), a = id.data;
+      for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) {
+        const lx = Math.min(W2 - 1, Math.floor((x0 + xx) / sX)), ly = Math.min(H2 - 1, Math.floor((y0 + yy) / sY));
+        if (labels[ly * W2 + lx] !== c.label) a[(yy * cw + xx) * 4 + 3] = 0;
+      }
+      ccx.putImageData(id, 0, 0);
+      const e = {
+        name: el.name + ' · parte ' + (k + 1), canvas: cc, ox: el.ox + x0, oy: el.oy + y0, ow: cw, oh: ch,
+        isBg: false, visible: el.visible, dispSrc: toDisp(cc, 700), t: null,
+        group: (el.group ? el.group + ' / ' : '') + el.name, isFolder: false, kids: null,
+      };
+      if (scaleT != null) e.t = { x: el.t.x + x0 * scaleT, y: el.t.y + y0 * scaleT, w: cw * scaleT, h: ch * scaleT };
+      return e;
+    });
+    const idx = PSD.elements.indexOf(el);
+    PSD.elements.splice(idx, 1, ...newEls);
+    pushHistory(el, newEls);
+    renderPsdLayers(); refreshAllBlocks();
+  }
+
+  function renderPsdLayers() {
+    const ul = $('psdLayers'); ul.innerHTML = '';
+    // exibe do topo para baixo (inverso do z-order) — mais intuitivo
+    PSD.elements.slice().reverse().forEach((el) => {
+      const li = document.createElement('li');
+      li.className = 'psdLayer' + (el.isBg ? ' bg' : '');
+      li.innerHTML =
+        `<img class="psdThumb" src="${el.dispSrc}" alt="">` +
+        `<span class="psdLayerName">${el.isFolder ? '📂 ' : ''}${esc(el.name)}` +
+          (el.group ? `<span class="psdGroupTag">${esc(el.group)}</span>` : '') + `</span>` +
+        (el.isFolder ? `<button class="psdLayerBadge psdOpenFolder" title="Separar as camadas de dentro">abrir pasta</button>` : '') +
+        (!el.isFolder && !el.isBg ? `<button class="psdLayerBadge psdSplit" title="Separar motivos que estão juntos nesta camada (ilhas de pixels)">separar</button>` : '') +
+        `<span class="psdLayerBadge psdKind">${el.isBg ? 'fundo' : 'elemento'}</span>` +
+        (!el.isBg ? `<button class="psdStar${PSD.starEl === el ? ' on' : ''}" title="Elemento principal (centralizado em destaque)">⭐</button>` : '') +
+        `<button class="psdEye" title="Mostrar/ocultar">👁</button>`;
+      const starBtn = li.querySelector('.psdStar');
+      if (starBtn) starBtn.addEventListener('click', () => {
+        PSD.starEl = (PSD.starEl === el) ? null : el;
+        renderPsdLayers();     // atualiza a ⭐ ativa
+        refreshAllBlocks();    // recompoe com o principal centralizado
+      });
+      const badge = li.querySelector('.psdKind');
+      badge.addEventListener('click', () => {
+        el.isBg = !el.isBg;
+        li.classList.toggle('bg', el.isBg);
+        badge.textContent = el.isBg ? 'fundo' : 'elemento';
+        refreshAllBlocks();
+      });
+      const openBtn = li.querySelector('.psdOpenFolder');
+      if (openBtn) openBtn.addEventListener('click', () => expandFolder(el));
+      const splitBtn = li.querySelector('.psdSplit');
+      if (splitBtn) splitBtn.addEventListener('click', () => splitLayer(el));
+      const eye = li.querySelector('.psdEye');
+      eye.addEventListener('click', () => {
+        el.visible = !el.visible;
+        eye.classList.toggle('off', !el.visible);
+        refreshAllBlocks();
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  function fgElements() { return PSD.elements.filter((e) => e.visible && !e.isBg); }
+  function bgElements() { return PSD.elements.filter((e) => e.visible && e.isBg); }
+  function drawCover(ctx, src, W, H) {
+    const s = Math.max(W / src.width, H / src.height);
+    const dw = src.width * s, dh = src.height * s;
+    ctx.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  }
+
+  // ===== Cálculo de layout (puro): retorna { T: Map(e->{x,y,w,h}), onlyStar, star } =====
+  // Tipo Pattern (estilos Stickers/Linear/Distribuído) preenche a máscara (rapport sempre ligado).
+  // Tipo Localizada (estilo Estrela) mostra SÓ o elemento ⭐, centralizado; os demais são removidos.
+  function layoutCompute(mk, S) {
+    const T = new Map();
+    const W = mk.w, H = mk.h;
+    const allFg = fgElements();
+    if (!allFg.length) return { T, onlyStar: false, star: null };
+    const star = (PSD.starEl && allFg.includes(PSD.starEl)) ? PSD.starEl : null;
+
+    if (S.tipo === 'localizada') {
+      // Estrela: só o principal, centralizado em destaque. Sem principal → centraliza tudo.
+      if (star) {
+        const s = (Math.min(W, H) * 0.62) / Math.max(star.ow, star.oh);
+        const w = star.ow * s, h = star.oh * s;
+        T.set(star, { w, h, x: (W - w) / 2, y: (H - h) / 2 });
+        return { T, onlyStar: true, star };
+      }
+      autoCompute(mk, 'center', S, T, allFg);
+      return { T, onlyStar: false, star: null };
+    }
+
+    // Pattern: preenche a máscara. Camadas full-canvas cobrem; os motivos distribuem.
+    if (S.estilo === 'stickers') {
+      autoCompute(mk, 'fill', { overlap: true }, T, allFg);   // preencher + sobrepor
+    } else {
+      for (const e of allFg.filter(isSpanning)) { const ss = Math.max(W / e.ow, H / e.oh); T.set(e, { w: e.ow * ss, h: e.oh * ss, x: (W - e.ow * ss) / 2, y: (H - e.oh * ss) / 2 }); }
+      const motifs = allFg.filter((e) => !isSpanning(e));
+      fillGridNoOverlap(motifs, W, H, T, S.estilo === 'distribuido');   // linear (grade) ou distribuído (xadrez)
+    }
+    return { T, onlyStar: false, star: null };
+  }
+
+  function autoCompute(mk, mode, S, T, fg) {
+    const W = mk.w, H = mk.h;
+    let uL = Infinity, uT = Infinity, uR = -Infinity, uB = -Infinity;
+    for (const e of fg) { uL = Math.min(uL, e.ox); uT = Math.min(uT, e.oy); uR = Math.max(uR, e.ox + e.ow); uB = Math.max(uB, e.oy + e.oh); }
+    const uW = Math.max(1, uR - uL), uH = Math.max(1, uB - uT);
+    if (mode === 'spread') {
+      const ordered = fg.slice().sort((a, b) => (a.ox + a.ow / 2) - (b.ox + b.ow / 2));
+      const n = ordered.length;
+      const maxOh = Math.max(1, ...ordered.map((e) => e.oh));
+      const s = (H * 0.72) / maxOh;
+      const mx = W * 0.04, usableW = W - 2 * mx;
+      ordered.forEach((e, i) => { const w = e.ow * s, h = e.oh * s; T.set(e, { w, h, x: mx + usableW * ((i + 0.5) / n) - w / 2, y: (H - h) / 2 }); });
+    } else if (mode === 'fill') {
+      for (const e of fg.filter(isSpanning)) { const ss = Math.max(W / e.ow, H / e.oh); T.set(e, { w: e.ow * ss, h: e.oh * ss, x: (W - e.ow * ss) / 2, y: (H - e.oh * ss) / 2 }); }
+      const motifs = fg.filter((e) => !isSpanning(e));
+      if (!S.overlap) { fillGridNoOverlap(motifs, W, H, T); return { T, pattern: null }; }
+      const dist = motifs.length ? motifs : fg;
+      const cxs = dist.map((e) => e.ox + e.ow / 2), cys = dist.map((e) => e.oy + e.oh / 2);
+      const minCx = Math.min(...cxs), maxCx = Math.max(...cxs), minCy = Math.min(...cys), maxCy = Math.max(...cys);
+      const spanX = Math.max(1, maxCx - minCx), spanY = Math.max(1, maxCy - minCy);
+      const mx = W * 0.04, my = H * 0.04, usX = W - 2 * mx, usY = H - 2 * my;
+      let s = Math.sqrt(Math.max(0.0001, (usX / spanX) * (usY / spanY))); s = Math.min(1.8, Math.max(0.4, s));
+      for (const e of motifs) {
+        const ncx = (e.ox + e.ow / 2 - minCx) / spanX, ncy = (e.oy + e.oh / 2 - minCy) / spanY;
+        let w = e.ow * s, h = e.oh * s;
+        const cap = Math.min(1, (W * 0.9) / w, (H * 0.9) / h); w *= cap; h *= cap;
+        const x = Math.max(0, Math.min(W - w, mx + ncx * usX - w / 2));
+        const y = Math.max(0, Math.min(H - h, my + ncy * usY - h / 2));
+        T.set(e, { w, h, x, y });
+      }
+    } else {
+      const margin = 0.86;
+      const s = Math.min((W * margin) / uW, (H * margin) / uH);
+      const offX = (W - uW * s) / 2 - uL * s, offY = (H - uH * s) / 2 - uT * s;
+      for (const e of fg) T.set(e, { w: e.ow * s, h: e.oh * s, x: e.ox * s + offX, y: e.oy * s + offY });
+    }
+    return { T, pattern: null };
+  }
+
+  // Preencher SEM sobrepor: grade 1-motivo-por-célula com respiro. stagger=true → linhas ímpares
+  // deslocadas meia célula (efeito xadrez/"Distribuído"); as pontas que saem entram pelo rapport.
+  function fillGridNoOverlap(motifs, W, H, T, stagger) {
+    const n = motifs.length; if (!n) return;
+    const cols = Math.max(1, Math.min(n, Math.round(Math.sqrt(n * W / H))));
+    const rows = Math.ceil(n / cols);
+    const cellW = W / cols, cellH = H / rows, margin = 0.76;
+    const ordered = motifs.slice().sort((a, b) => (a.oy + a.oh / 2) - (b.oy + b.oh / 2) || (a.ox + a.ow / 2) - (b.ox + b.ow / 2));
+    ordered.forEach((e, i) => {
+      const c = i % cols, r = Math.floor(i / cols);
+      const s = Math.min((cellW * margin) / e.ow, (cellH * margin) / e.oh);
+      const w = e.ow * s, h = e.oh * s;
+      const freeX = cellW - w, freeY = cellH - h;
+      const jx = stagger ? 0 : (((i * 73) % 100) / 100 - 0.5) * freeX * 0.5;
+      const jy = stagger ? 0 : (((i * 37 + 11) % 100) / 100 - 0.5) * freeY * 0.5;
+      const off = (stagger && r % 2 === 1) ? cellW / 2 : 0;   // xadrez: desloca linhas ímpares
+      T.set(e, { w, h, x: c * cellW + freeX / 2 + jx + off, y: r * cellH + freeY / 2 + jy });
+    });
+  }
+
+  // Estampa Pattern: ladrilha os motivos numa grade que preenche a máscara com emenda contínua.
+  function patternCompute(mk, S, T, fg) {
+    const W = mk.w, H = mk.h;
+    for (const e of fg.filter(isSpanning)) { const ss = Math.max(W / e.ow, H / e.oh); T.set(e, { w: e.ow * ss, h: e.oh * ss, x: (W - e.ow * ss) / 2, y: (H - e.oh * ss) / 2 }); }
+    const motifs = fg.filter((e) => !isSpanning(e));
+    if (!motifs.length) return { T, pattern: null };
+    let uL = Infinity, uT = Infinity, uR = -Infinity, uB = -Infinity;
+    for (const e of motifs) { uL = Math.min(uL, e.ox); uT = Math.min(uT, e.oy); uR = Math.max(uR, e.ox + e.ow); uB = Math.max(uB, e.oy + e.oh); }
+    const uW = Math.max(1, uR - uL), uH = Math.max(1, uB - uT);
+    const cols = Math.max(2, Math.min(8, parseInt(S.cols, 10) || 3));
+    const tileW = W / cols; let tileH = tileW * (uH / uW);
+    let rows = Math.max(1, Math.round(H / tileH)); tileH = H / rows;
+    const s = Math.max(tileW / uW, tileH / uH);
+    for (const e of motifs) { const w = e.ow * s, h = e.oh * s; T.set(e, { w, h, x: (e.ox - uL) * s + (tileW - uW * s) / 2, y: (e.oy - uT) * s + (tileH - uH * s) / 2 }); }
+    return { T, pattern: { cols, rows, tileW, tileH } };
+  }
+
+  // Rapport (dá a volta) é sempre ligado no Pattern: cópias laterais ±largura. Localizada não repete.
+  function wrapOffsets(mk, S) {
+    return S.tipo === 'pattern' ? [{ dx: -mk.w, dy: 0 }, { dx: mk.w, dy: 0 }] : [];
+  }
+
+  // Compõe (no tamanho EXATO) a partir do layout ATUAL do editor (respeita arrastes). Fundo sempre
+  // TRANSPARENTE. Estilo Estrela → desenha só o principal. Pattern → desenha todos + rapport (±largura).
+  function composeFrom(ed) {
+    const mk = PSD_MASKS[ed.maskIdx], W = mk.w, H = mk.h, S = ed.S, L = ed.layout;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    const els = L.onlyStar ? [L.star] : fgElements();
+    const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
+    for (const e of els) {
+      const t = L.T.get(e); if (!t) continue;
+      ctx.drawImage(e.canvas, t.x, t.y, t.w, t.h);
+      for (const o of wraps) ctx.drawImage(e.canvas, t.x + o.dx, t.y + o.dy, t.w, t.h);
+    }
+    return cv;
+  }
+
+  // ===== Editores interativos (um bloco arrastável por produto marcado) =====
+  const ESTILOS = {
+    pattern: [{ v: 'stickers', label: 'Stickers' }, { v: 'linear', label: 'Linear' }, { v: 'distribuido', label: 'Distribuído' }],
+    localizada: [{ v: 'estrela', label: 'Estrela' }],
+  };
+  const DEFAULT_ESTILO = { pattern: 'stickers', localizada: 'estrela' };
+  // Padrão: Pattern + Stickers, fundo sempre transparente, rapport sempre ligado (no Pattern).
+  function defaultSettings() { return { tipo: 'pattern', estilo: 'stickers' }; }
+  // posiciona o elemento (e seus fantasmas de rapport/pattern) no stage do editor
+  function edPositionEl(ed, e) {
+    const t = ed.layout.T.get(e), rec = ed.nodes.get(e);
+    if (!t || !rec) return;
+    const put = (node, dx, dy) => { if (!node) return;
+      node.style.left = ((t.x + dx) * ed.disp) + 'px'; node.style.top = ((t.y + dy) * ed.disp) + 'px';
+      node.style.width = (t.w * ed.disp) + 'px'; node.style.height = (t.h * ed.disp) + 'px'; };
+    put(rec.node, 0, 0);
+    rec.ghosts.forEach((g) => put(g, Number(g.dataset.dx) || 0, Number(g.dataset.dy) || 0));
+  }
+  function edSelect(ed, e) {
+    if (ed.sel) { const r = ed.nodes.get(ed.sel); if (r) r.node.classList.remove('sel'); }
+    ed.sel = e;
+    if (e) { const r = ed.nodes.get(e); if (r) r.node.classList.add('sel'); }
+  }
+  function edAttachDrag(ed, node, e) {
+    const handle = node.querySelector('.psdHandle');
+    node.addEventListener('pointerdown', (ev) => {
+      if (ev.target === handle) return;
+      ev.preventDefault(); edSelect(ed, e);
+      node.classList.add('dragging'); try { node.setPointerCapture(ev.pointerId); } catch {}
+      const t = ed.layout.T.get(e), sx = ev.clientX, sy = ev.clientY, ox = t.x, oy = t.y;
+      const move = (m) => { t.x = ox + (m.clientX - sx) / ed.disp; t.y = oy + (m.clientY - sy) / ed.disp; edPositionEl(ed, e); };
+      const up = () => {
+        node.classList.remove('dragging');
+        if (ed.S.tipo === 'pattern') { const W = PSD_MASKS[ed.maskIdx].w; let cx = t.x + t.w / 2; cx = ((cx % W) + W) % W; t.x = cx - t.w / 2; edPositionEl(ed, e); }
+        node.removeEventListener('pointermove', move); node.removeEventListener('pointerup', up);
+      };
+      node.addEventListener('pointermove', move); node.addEventListener('pointerup', up);
+    });
+    handle.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); edSelect(ed, e);
+      try { handle.setPointerCapture(ev.pointerId); } catch {}
+      const t = ed.layout.T.get(e), sx = ev.clientX, ow = t.w, oh = t.h, ratio = oh / ow, cx = t.x, cy = t.y;
+      const move = (m) => { const w = Math.max(20, ow + (m.clientX - sx) / ed.disp), h = w * ratio;
+        t.w = w; t.h = h; t.x = cx + (ow - w) / 2; t.y = cy + (oh - h) / 2; edPositionEl(ed, e); };
+      const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+      handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up);
+    });
+  }
+  // renderiza o stage do editor a partir de ed.layout (fundo transparente; mantém os arrastes atuais)
+  function edRenderStage(ed) {
+    const mk = PSD_MASKS[ed.maskIdx], S = ed.S, L = ed.layout;
+    const disp = Math.min(660 / mk.w, 480 / mk.h); ed.disp = disp;
+    const dW = Math.round(mk.w * disp), dH = Math.round(mk.h * disp);
+    const stage = ed.dom.stage;
+    stage.style.width = dW + 'px'; stage.style.height = dH + 'px';
+    stage.innerHTML = ''; ed.nodes = new Map(); ed.sel = null;
+    const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
+    const els = L.onlyStar ? [L.star] : fgElements();
+    for (const e of els) {
+      const t = L.T.get(e); if (!t) continue;
+      const d = document.createElement('div'); d.className = 'psdEl';
+      d.innerHTML = `<img src="${e.dispSrc}" alt=""><span class="psdHandle"></span>`;
+      const rec = { node: d, ghosts: [] };
+      ed.nodes.set(e, rec); edAttachDrag(ed, d, e); stage.appendChild(d);
+      for (const o of wraps) {
+        const g = document.createElement('div'); g.className = 'psdEl ghost'; g.dataset.dx = String(o.dx); g.dataset.dy = String(o.dy);
+        g.innerHTML = `<img src="${e.dispSrc}" alt="">`;
+        rec.ghosts.push(g); stage.appendChild(g);
+      }
+      edPositionEl(ed, e);
+    }
+    stage.onpointerdown = (ev) => { if (ev.target === stage) edSelect(ed, null); };
+  }
+  // recalcula posições (arranjo/tipo/pattern) e re-renderiza
+  function relayout(ed) { ed.layout = layoutCompute(PSD_MASKS[ed.maskIdx], ed.S); edRenderStage(ed); }
+  const refreshBlock = relayout;
+  function refreshAllBlocks() { editors.forEach((ed) => { if (ed.dom) relayout(ed); }); }
+  function updateEditorsHint() { $('psdEditorsHint').classList.toggle('hidden', editors.length > 0); }
+
+  function addEditor(maskIdx) {
+    if (editors.some((e) => e.maskIdx === maskIdx)) return;
+    const ed = { maskIdx, S: defaultSettings(PSD_MASKS[maskIdx]), dom: null, layout: null, nodes: new Map(), sel: null, disp: 1 };
+    editors.push(ed);
+    ed.dom = buildBlock(ed);
+    $('psdEditors').appendChild(ed.dom.root);
+    relayout(ed);
+    updateEditorsHint();
+  }
+  function removeEditor(maskIdx) {
+    const i = editors.findIndex((e) => e.maskIdx === maskIdx);
+    if (i < 0) return;
+    if (editors[i].dom) editors[i].dom.root.remove();
+    editors.splice(i, 1);
+    updateEditorsHint();
+  }
+
+  const TIPO_HINT = {
+    pattern: 'Padrão corrido: motivos repetidos preenchendo a máscara (dá a volta no produto).',
+    localizada: 'Arte central: destaca o elemento ⭐ no meio da máscara.',
+  };
+  const ESTILO_HINT = {
+    stickers: 'Stickers: motivos preenchendo, podendo se sobrepor.',
+    linear: 'Linear: motivos em grade, sem sobrepor (com respiro).',
+    distribuido: 'Distribuído: grade alternada (efeito xadrez).',
+    estrela: 'Estrela: só o elemento ⭐, centralizado em destaque (os demais saem).',
+  };
+  function buildBlock(ed) {
+    const mk = PSD_MASKS[ed.maskIdx];
+    const root = document.createElement('div');
+    root.className = 'psdBlock';
+    root.innerHTML =
+      `<div class="psdBlockHead"><strong>${esc(mk.label)}</strong><span class="dims">${mk.w}×${mk.h}px</span></div>` +
+      '<div class="psdStageWrap"><div class="psdStage js-stage"></div></div>' +
+      '<p class="note" style="margin:.5rem 0 0">Arraste um elemento para mover; use a alça no canto para redimensionar.</p>' +
+      '<div class="psdControls">' +
+        '<div class="tipoField" style="margin:0"><span class="tipoLabel">Tipo de estampa</span>' +
+          '<div class="tipoSeg js-tipo"><button type="button" class="tipoBtn" data-tipo="pattern">Pattern</button><button type="button" class="tipoBtn" data-tipo="localizada">Localizada</button></div>' +
+          '<p class="tipoHint js-tipohint"></p></div>' +
+        '<div class="psdCtl"><span>Estilo de adaptação</span><div class="psdBtnRow js-estilo"></div>' +
+          '<p class="tipoHint js-esthint" style="margin:.35rem 0 0"></p></div>' +
+      '</div>' +
+      '<a class="dlBtn js-dl" style="display:inline-block;margin-top:.75rem">Baixar PNG</a>';
+    const q = (c) => root.querySelector(c);
+    const S = ed.S;
+    const renderEstilos = () => {
+      const cont = q('.js-estilo'); cont.innerHTML = '';
+      ESTILOS[S.tipo].forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'psdMiniBtn js-est' + (o.v === S.estilo ? ' active' : '');
+        b.textContent = o.label; b.dataset.est = o.v;
+        b.addEventListener('click', () => {
+          S.estilo = o.v;
+          cont.querySelectorAll('.js-est').forEach((x) => x.classList.toggle('active', x === b));
+          q('.js-esthint').textContent = ESTILO_HINT[o.v] || '';
+          relayout(ed);
+        });
+        cont.appendChild(b);
+      });
+      q('.js-esthint').textContent = ESTILO_HINT[S.estilo] || '';
+    };
+    const applyTipoUI = () => {
+      root.querySelectorAll('.js-tipo .tipoBtn').forEach((b) => b.classList.toggle('active', b.dataset.tipo === S.tipo));
+      q('.js-tipohint').textContent = TIPO_HINT[S.tipo] || '';
+      renderEstilos();
+    };
+    applyTipoUI();
+    root.querySelectorAll('.js-tipo .tipoBtn').forEach((b) => b.addEventListener('click', () => {
+      if (S.tipo === b.dataset.tipo) return;
+      S.tipo = b.dataset.tipo; S.estilo = DEFAULT_ESTILO[S.tipo];
+      applyTipoUI(); relayout(ed);
+    }));
+    q('.js-dl').addEventListener('click', (e) => { e.preventDefault(); baixarCanvas(ed); });
+    return { root, stage: q('.js-stage') };
+  }
+
+  function baixarCanvas(ed) {
+    const mk = PSD_MASKS[ed.maskIdx];
+    composeFrom(ed).toBlob((blob) => {
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = `estampa-${mk.key}-${mk.w}x${mk.h}.png`; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    }, 'image/png');
+  }
+</script>

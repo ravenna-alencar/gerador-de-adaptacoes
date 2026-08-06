@@ -1,0 +1,6 @@
+{
+  "name": "gerador-de-adaptacoes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gera adaptações de uma imagem para tamanhos pré-definidos, recompondo os elementos via IA (AI Proxy + PiApp)."
+}

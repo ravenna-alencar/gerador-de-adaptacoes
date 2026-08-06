@@ -1,0 +1,16 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Dependências (não há build, mas por higiene)
+node_modules/
+
+# Segredos — NUNCA versionar (os tokens ficam como secrets do GoDeploy)
+.env
+.env.*
+*.local
+
+# Logs e temporários
+*.log
+tmp/
+.cache/
