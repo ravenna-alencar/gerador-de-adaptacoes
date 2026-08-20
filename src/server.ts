@@ -217,6 +217,30 @@ async function sugerirNomesEstampa(
   return nomes;
 }
 
+/**
+ * Tags criadas pelo usuário na página "Criar Tag" (menu Ilustração). São a ÚNICA fonte das
+ * opções de Coleção (categoria 'colecao') e Licenciado (categoria 'licenciado') no seletor de
+ * Segmento — não há mais lista fixa no código. Futebol continua travado nos 18 times oficiais.
+ * `nome_norm` (slug) existe só para impedir duplicata por acento/caixa ("Verão 2027" x "verao 2027").
+ */
+async function ensureTagsTable(env: Env): Promise<void> {
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_email TEXT,
+      categoria TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      nome_norm TEXT NOT NULL
+    )`,
+    [],
+  );
+  await env.DB.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS tags_cat_nome ON tags (categoria, nome_norm)`,
+    [],
+  );
+}
+
 async function ensureRegistrosTable(env: Env): Promise<void> {
   await env.DB.exec(
     `CREATE TABLE IF NOT EXISTS registros_estampas (
@@ -807,6 +831,58 @@ export default {
       // Registro de produtos + máscaras (fonte única para a aba "Adaptar imagem").
       if (pathname === '/api/produtos') {
         return json({ produtos: PRODUTOS.map((p) => ({ key: p.key, label: p.label, cat: p.cat, masks: p.masks })) });
+      }
+
+      // ---- Tags (página "Criar Tag") — alimentam Coleção e Licenciado no Segmento ----
+      if (pathname === '/api/tags' && request.method === 'GET') {
+        await ensureTagsTable(env);
+        const r = await env.DB.query(
+          `SELECT id, categoria, nome, created_at, user_email FROM tags ORDER BY categoria, nome COLLATE NOCASE`,
+          [],
+        );
+        const tags = r.rows.map((row) => ({
+          id: Number(row.id),
+          categoria: String(row.categoria),
+          nome: String(row.nome),
+          criadoEm: String(row.created_at || ''),
+          criadoPor: displayNameFromEmail(row.user_email as string | null),
+        }));
+        return json({ tags });
+      }
+
+      if (pathname === '/api/tags' && request.method === 'POST') {
+        await ensureTagsTable(env);
+        const body = (await request.json()) as { categoria?: string; nome?: string };
+        const categoria = String(body.categoria || '').trim();
+        const nome = String(body.nome || '').trim().replace(/\s+/g, ' ');
+        if (categoria !== 'colecao' && categoria !== 'licenciado') {
+          return json({ error: 'categoria deve ser "colecao" ou "licenciado"' }, 400);
+        }
+        if (!nome) return json({ error: 'nome da tag é obrigatório' }, 400);
+        if (nome.length > 60) return json({ error: 'nome da tag muito longo (máx. 60 caracteres)' }, 400);
+        const nomeNorm = slugify(nome);
+        const dup = await env.DB.query(
+          `SELECT nome FROM tags WHERE categoria = ? AND nome_norm = ?`,
+          [categoria, nomeNorm],
+        );
+        if (dup.rows.length) {
+          return json({ error: `já existe uma tag "${String(dup.rows[0].nome)}" nessa categoria` }, 409);
+        }
+        await env.DB.exec(
+          `INSERT INTO tags (created_at, user_email, categoria, nome, nome_norm) VALUES (?, ?, ?, ?, ?)`,
+          [new Date().toISOString(), request.headers.get('x-godeploy-user-email') || null, categoria, nome, nomeNorm],
+        );
+        const idRes = await env.DB.query('SELECT last_insert_rowid() AS id', []);
+        return json({ ok: true, tag: { id: Number(idRes.rows[0]?.id ?? 0), categoria, nome } });
+      }
+
+      if (pathname === '/api/tags/excluir' && request.method === 'POST') {
+        await ensureTagsTable(env);
+        const body = (await request.json()) as { id?: number };
+        const id = Number(body.id);
+        if (!id) return json({ error: 'id obrigatório' }, 400);
+        await env.DB.exec('DELETE FROM tags WHERE id = ?', [id]);
+        return json({ ok: true });
       }
 
       // Sugere 3 nomes para a estampa (Etapa 0 da aba "Adaptar PSD"), a partir do

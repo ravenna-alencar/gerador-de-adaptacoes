@@ -428,6 +428,24 @@
   .navSoon { flex: none; font-size: .78rem; opacity: .75; }
   .shell > .page { flex: 1; min-width: 0; }
 
+  /* Criar Tag */
+  .tagView { display: flex; flex-direction: column; gap: 1.5rem; max-width: 720px; }
+  .tagCols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 620px) { .tagCols { grid-template-columns: 1fr; } }
+  .tagColTitle { margin: 0 0 .5rem; font-size: .7rem; font-weight: 750; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); }
+  .tagList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .tagList li { display: flex; align-items: center; gap: .5rem; padding: .45rem .6rem; border: 1px solid var(--border);
+    border-radius: 9px; background: var(--surface-2); font-size: .88rem; }
+  .tagList li.tagEmpty { border-style: dashed; background: transparent; color: var(--muted); justify-content: center; }
+  .tagName { flex: 1; min-width: 0; font-weight: 600; }
+  .tagWho { font-size: .72rem; color: var(--muted); }
+  .tagDel { flex: none; border: none; background: transparent; color: var(--muted); cursor: pointer;
+    font: inherit; font-size: .95rem; line-height: 1; padding: .15rem .3rem; border-radius: 6px; }
+  .tagDel:hover { color: #dc2626; background: color-mix(in srgb, #dc2626 12%, transparent); }
+  #tagMsg.tagErr { color: #dc2626; }
+  #tagMsg.tagOk { color: #16a34a; }
+
   /* Placeholder das áreas ainda não construídas */
   .soonCard { text-align: center; padding: 3rem 1.5rem; }
   .soonIco { font-size: 2.6rem; line-height: 1; margin-bottom: .6rem; }
@@ -524,8 +542,8 @@
     <button type="button" class="navItem" data-view="id">
       <span class="navIco" aria-hidden="true">🔍</span><span class="navLabel">Adaptar ID</span>
     </button>
-    <button type="button" class="navItem" data-view="tag" data-soon="1">
-      <span class="navIco" aria-hidden="true">🏷️</span><span class="navLabel">Criar Tag</span><span class="navSoon" title="Em construção">🚧</span>
+    <button type="button" class="navItem" data-view="tag">
+      <span class="navIco" aria-hidden="true">🏷️</span><span class="navLabel">Criar Tag</span>
     </button>
     <button type="button" class="navItem" data-view="estampas">
       <span class="navIco" aria-hidden="true">🔥</span><span class="navLabel">Best Sellers</span>
@@ -554,6 +572,40 @@
       <div class="soonIco" aria-hidden="true">🚧</div>
       <h2 id="soonTitle">Em construção</h2>
       <p class="note" id="soonNote">Esta área ainda está sendo construída.</p>
+    </div>
+  </div>
+
+  <div id="view-tag" class="hidden tagView">
+    <div class="card">
+      <h2>Criar Tag</h2>
+      <p class="note">As tags criadas aqui são as opções de <strong>Coleção</strong> e <strong>Licenciado</strong> no Segmento, na hora de identificar a estampa (Novo ID).</p>
+      <div class="tipoField">
+        <span class="tipoLabel">Categoria</span>
+        <div class="tipoSeg" id="tagCategoria">
+          <button type="button" class="tipoBtn active" data-tagcat="colecao">Coleção</button>
+          <button type="button" class="tipoBtn" data-tagcat="licenciado">Licenciado</button>
+        </div>
+      </div>
+      <div class="tipoField">
+        <span class="tipoLabel">Nome da Tag</span>
+        <input id="tagNome" class="amInput" maxlength="60" placeholder="Ex.: Verão 2027" autocomplete="off" />
+      </div>
+      <button class="genBtn" id="tagCriar" type="button" disabled>Criar Tag</button>
+      <p class="note" id="tagMsg"></p>
+    </div>
+
+    <div class="card">
+      <h2>Tags criadas</h2>
+      <div class="tagCols">
+        <div>
+          <p class="tagColTitle">Coleção</p>
+          <ul class="tagList" id="tagListColecao"><li class="tagEmpty">Carregando…</li></ul>
+        </div>
+        <div>
+          <p class="tagColTitle">Licenciado</p>
+          <ul class="tagList" id="tagListLicenciado"><li class="tagEmpty">Carregando…</li></ul>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -638,8 +690,6 @@
           <div class="tipoField psdIdTagField">
             <span class="tipoLabel" id="idTagLabel">Time</span>
             <select id="idTagSelect" class="amInput"></select>
-            <input id="idTagInput" class="amInput hidden" placeholder="Ex.: Flamengo" list="idTagOptions" autocomplete="off" />
-            <datalist id="idTagOptions"></datalist>
           </div>
           <p class="err" id="idErr"></p>
         </div>
@@ -1022,9 +1072,8 @@
   // ---- Menu lateral ----
   // Views reais (têm container próprio). O resto do menu ainda não foi construído
   // e cai no placeholder #view-soon (🚧), com o título vindo do próprio item.
-  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar' };
+  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar', tag: 'view-tag' };
   const SOON_NOTE = {
-    tag: 'Aqui você vai criar/configurar uma nova coleção (tag). Em construção.',
     'cad-geral': 'Panorama do cadastro de estampas. Em construção.',
     'cad-futebol': 'Cadastro das estampas de futebol. Em construção.',
     'cad-licenciados': 'Cadastro das estampas licenciadas. Em construção.',
@@ -1049,6 +1098,7 @@
     document.querySelector('.page').classList.toggle('psdWide', view === 'psd');
     if (view === 'estampas' && !estampasLoaded) loadEstampas();
     if (view === 'psd') ensurePsdMaskOptions();
+    if (view === 'tag') loadTags();
   }
 
   document.querySelectorAll('.sidenav .navItem').forEach((t) => {
@@ -1375,36 +1425,135 @@
     'Flamengo', 'Fluminense', 'Fortaleza', 'Grêmio', 'Internacional', 'Palmeiras', 'Santos',
     'São Paulo', 'Sport Recife', 'Vasco da Gama', 'Vitória',
   ];
-  const LICENCIADOS = [
-    'Lilo & Stitch', 'Princesas', 'Harry Potter', 'Mickey & Amigos', 'Ursinho Pooh', 'Star Wars',
-    'Stranger Things', 'Patrulha Canina', 'Barbie', 'Snoopy', 'Toy Story', 'Sanrio',
-    'Homem-Aranha', 'Garfield', 'Rock in Rio',
-  ];
+  // Coleção e Licenciado NÃO têm mais lista fixa: as opções vêm só das tags criadas em
+  // "Criar Tag" (/api/tags). TAGS é o cache local, preenchido por loadTags().
+  const TAGS = { colecao: [], licenciado: [] };
   const idState = { categoria: 'Case', segmento: 'futebol', tag: '' };
+  // Todos os segmentos usam <select> travado: futebol nos 18 times oficiais, autoral e
+  // licenciado nas tags cadastradas — sem texto livre, pra não fragmentar o SKU com
+  // grafias diferentes da mesma coleção/licença.
   const idTagMeta = {
-    // futebol usa <select> travado nos 18 times oficiais (sem texto livre — evita time
-    // fora da lista e evita grafias diferentes pro mesmo time fragmentando o SKU).
-    futebol: { label: 'Time', kind: 'select', options: FUTEBOL_TIMES },
-    autoral: { label: 'Coleção', kind: 'text', placeholder: 'Ex.: Verão 2027', options: [] },
-    licenciado: { label: 'Licenciado', kind: 'text', placeholder: 'Ex.: Harry Potter', options: LICENCIADOS },
+    futebol: { label: 'Time', options: () => FUTEBOL_TIMES },
+    autoral: { label: 'Coleção', options: () => TAGS.colecao, vazio: 'Nenhuma coleção criada — crie em "Criar Tag"' },
+    licenciado: { label: 'Licenciado', options: () => TAGS.licenciado, vazio: 'Nenhum licenciado criado — crie em "Criar Tag"' },
   };
 
   function idApplyTagMeta() {
     const meta = idTagMeta[idState.segmento] || idTagMeta.futebol;
+    const opts = meta.options();
     $('idTagLabel').textContent = meta.label;
-    if (meta.kind === 'select') {
-      $('idTagSelect').innerHTML = meta.options.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
-      $('idTagSelect').classList.remove('hidden');
-      $('idTagInput').classList.add('hidden');
-      idState.tag = $('idTagSelect').value || '';
+    if (!opts.length) {
+      $('idTagSelect').innerHTML = `<option value="">${esc(meta.vazio || 'Nenhuma opção disponível')}</option>`;
+      $('idTagSelect').disabled = true;
+      idState.tag = '';
     } else {
-      $('idTagInput').placeholder = meta.placeholder || '';
-      $('idTagOptions').innerHTML = meta.options.map((o) => `<option value="${esc(o)}"></option>`).join('');
-      $('idTagInput').classList.remove('hidden');
-      $('idTagSelect').classList.add('hidden');
-      idState.tag = $('idTagInput').value || '';
+      $('idTagSelect').innerHTML = opts.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      $('idTagSelect').disabled = false;
+      idState.tag = $('idTagSelect').value || '';
     }
   }
+
+  // ---- Criar Tag ----
+  let tagsLoaded = false;
+  function tagRender() {
+    [['colecao', 'tagListColecao'], ['licenciado', 'tagListLicenciado']].forEach(([cat, listId]) => {
+      const itens = TAGS[cat + 'Full'] || [];
+      $(listId).innerHTML = itens.length
+        ? itens.map((t) => `<li><span class="tagName">${esc(t.nome)}</span>` +
+            `${t.criadoPor ? `<span class="tagWho">${esc(t.criadoPor)}</span>` : ''}` +
+            `<button type="button" class="tagDel" data-id="${t.id}" title="Excluir tag">✕</button></li>`).join('')
+        : '<li class="tagEmpty">Nenhuma tag criada ainda</li>';
+    });
+  }
+
+  async function loadTags(force) {
+    if (tagsLoaded && !force) return;
+    try {
+      const r = await fetch('/api/tags');
+      const j = await r.json();
+      const all = j.tags || [];
+      ['colecao', 'licenciado'].forEach((cat) => {
+        const doCat = all.filter((t) => t.categoria === cat);
+        TAGS[cat] = doCat.map((t) => t.nome);
+        TAGS[cat + 'Full'] = doCat;
+      });
+      tagsLoaded = true;
+      tagRender();
+      // As opções de Segmento dependem das tags — reaplica se o segmento atual usa tag.
+      if (idState.segmento === 'autoral' || idState.segmento === 'licenciado') {
+        idApplyTagMeta();
+        idValidate();
+      }
+    } catch (err) {
+      $('tagListColecao').innerHTML = '<li class="tagEmpty">Erro ao carregar</li>';
+      $('tagListLicenciado').innerHTML = '<li class="tagEmpty">Erro ao carregar</li>';
+    }
+  }
+
+  function tagMsg(txt, cls) {
+    const el = $('tagMsg');
+    el.textContent = txt || '';
+    el.className = 'note' + (cls ? ' ' + cls : '');
+  }
+
+  let tagCat = 'colecao';
+  $('tagCategoria').querySelectorAll('.tipoBtn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      $('tagCategoria').querySelectorAll('.tipoBtn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      tagCat = btn.dataset.tagcat;
+      tagMsg('');
+    });
+  });
+  $('tagNome').addEventListener('input', () => {
+    $('tagCriar').disabled = !$('tagNome').value.trim();
+    tagMsg('');
+  });
+  $('tagNome').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && $('tagNome').value.trim()) $('tagCriar').click();
+  });
+  $('tagCriar').addEventListener('click', async () => {
+    const nome = $('tagNome').value.trim();
+    if (!nome) return;
+    $('tagCriar').disabled = true;
+    tagMsg('Criando…');
+    try {
+      const r = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ categoria: tagCat, nome }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'falha ao criar');
+      $('tagNome').value = '';
+      await loadTags(true);
+      tagMsg(`Tag "${nome}" criada.`, 'tagOk');
+    } catch (err) {
+      tagMsg(err.message, 'tagErr');
+      $('tagCriar').disabled = false;
+    }
+  });
+  $('view-tag').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.tagDel');
+    if (!btn) return;
+    const li = btn.closest('li');
+    const nome = li ? li.querySelector('.tagName').textContent : 'essa tag';
+    if (!confirm(`Excluir a tag "${nome}"? As estampas já registradas com ela não mudam.`)) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/tags/excluir', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: Number(btn.dataset.id) }),
+      });
+      if (!r.ok) throw new Error('falha ao excluir');
+      await loadTags(true);
+      tagMsg(`Tag "${nome}" excluída.`, 'tagOk');
+    } catch (err) {
+      tagMsg(err.message, 'tagErr');
+      btn.disabled = false;
+    }
+  });
 
   function idValidate() {
     const ok = !!(idState.categoria && idState.segmento && idState.tag.trim());
@@ -1428,10 +1577,11 @@
   }
   idWireSeg('idCategoria', 'categoria');
   idWireSeg('idSegmento', 'segmento');
-  $('idTagInput').addEventListener('input', (e) => { idState.tag = e.target.value; idValidate(); });
   $('idTagSelect').addEventListener('change', (e) => { idState.tag = e.target.value; idValidate(); });
   idApplyTagMeta();
   idValidate();
+  // Carrega as tags já na abertura: o seletor de Coleção/Licenciado depende delas.
+  loadTags();
 
   // ================= Página 1 "Nomear" <-> Página 2 "Adaptar" =================
   // Com PSD: aprovar o nome só grava o "cabeçalho" (identifier) e leva pra página de Adaptar —
