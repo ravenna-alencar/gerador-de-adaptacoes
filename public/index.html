@@ -2,54 +2,160 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <title>Gerador de Adaptações</title>
+<script>(function () {
+  var KEY = 'gda-theme';
+  var root = document.documentElement;
+  function apply(t) { root.setAttribute('data-theme', t); }
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (err) {}
+  var current = saved || ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
+  apply(current);
+  var STAGE_KEY = 'gda-stage-bg';
+  var savedStageBg = null;
+  try { savedStageBg = localStorage.getItem(STAGE_KEY); } catch (err) {}
+  root.setAttribute('data-stage-bg', savedStageBg || 'checker');
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target.closest && ev.target.closest('#themeToggle');
+    if (btn) {
+      current = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      apply(current);
+      try { localStorage.setItem(KEY, current); } catch (err) {}
+      return;
+    }
+    var swatch = ev.target.closest && ev.target.closest('.stageBgSwatch');
+    if (swatch) {
+      var v = swatch.getAttribute('data-bg');
+      root.setAttribute('data-stage-bg', v);
+      try { localStorage.setItem(STAGE_KEY, v); } catch (err) {}
+    }
+  });
+})();</script>
 <style>
   :root {
-    --bg: #f1f5f9; --surface: #fff; --border: #e2e8f0; --text: #0f172a;
-    --muted: #64748b; --primary: #2563eb; --primary-hover: #1d4ed8; --danger: #dc2626;
+    --bg: #f1f5f9; --surface: #fff; --surface-2: #f8fafc; --surface-3: #fbfcfe;
+    --border: #e2e8f0; --text: #0f172a; --muted: #64748b; --muted-2: #94a3b8;
+    --primary: #2563eb; --primary-hover: #1d4ed8; --accent2: #7c3aed;
+    --tint-1: #eff6ff; --tint-1-hover: #dbeafe; --tint-2: #eef4ff; --chip-bg: #eef1f6;
+    --layer-bg: #f1f5f9; --disabled-bg: #e2e8f0;
+    --danger: #dc2626; --danger-bg: #fef2f2; --danger-border: #fecaca;
+    --success: #16a34a; --success-bg: #f0fdf4; --success-bg-hover: #dcfce7; --success-border: #86efac;
+    --accent2-border: #c4b5fd; --accent2-bg: #f5f3ff; --accent2-bg-hover: #ede9fe;
+    --warn: #f59e0b; --warn-bg: #fffbeb;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 2px 8px rgba(15,23,42,.06);
+    --shadow-md: 0 8px 24px rgba(15,23,42,.10);
+    --topbar-bg: rgba(255,255,255,.82);
+    color-scheme: light;
+    --stage-gray: #97a3b3; --stage-blue: #5b8bd0;
     font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   }
+  :root[data-theme="dark"] {
+    --bg: #0b1220; --surface: #111827; --surface-2: #1a2437; --surface-3: #17202f;
+    --border: #263449; --text: #e5e9f0; --muted: #94a3b8; --muted-2: #64748b;
+    --primary: #3b82f6; --primary-hover: #60a5fa; --accent2: #a78bfa;
+    --tint-1: #16223a; --tint-1-hover: #1c2c4a; --tint-2: #17223a; --chip-bg: #1a2434;
+    --layer-bg: #17202f; --disabled-bg: #334155;
+    --danger: #f87171; --danger-bg: #2a1216; --danger-border: #7f1d1d;
+    --success: #4ade80; --success-bg: #0f2a1a; --success-bg-hover: #163a24; --success-border: #16653d;
+    --accent2-border: #5b21b6; --accent2-bg: #241a3d; --accent2-bg-hover: #2f2150;
+    --warn: #fbbf24; --warn-bg: #3a2c0d;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4), 0 2px 10px rgba(0,0,0,.45);
+    --shadow-md: 0 10px 28px rgba(0,0,0,.5);
+    --topbar-bg: rgba(17,24,39,.75);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) {
+      --bg: #0b1220; --surface: #111827; --surface-2: #1a2437; --surface-3: #17202f;
+      --border: #263449; --text: #e5e9f0; --muted: #94a3b8; --muted-2: #64748b;
+      --primary: #3b82f6; --primary-hover: #60a5fa; --accent2: #a78bfa;
+      --tint-1: #16223a; --tint-1-hover: #1c2c4a; --tint-2: #17223a; --chip-bg: #1a2434;
+      --layer-bg: #17202f; --disabled-bg: #334155;
+      --danger: #f87171; --danger-bg: #2a1216; --danger-border: #7f1d1d;
+      --success: #4ade80; --success-bg: #0f2a1a; --success-bg-hover: #163a24; --success-border: #16653d;
+      --accent2-border: #5b21b6; --accent2-bg: #241a3d; --accent2-bg-hover: #2f2150;
+      --warn: #fbbf24; --warn-bg: #3a2c0d;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,.4), 0 2px 10px rgba(0,0,0,.45);
+      --shadow-md: 0 10px 28px rgba(0,0,0,.5);
+      --topbar-bg: rgba(17,24,39,.75);
+      color-scheme: dark;
+    }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text); }
-  .page { max-width: 1180px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; }
+  body { margin: 0; color: var(--text);
+    background: radial-gradient(1100px 560px at 12% -12%, rgba(37,99,235,.07), transparent 60%),
+                radial-gradient(900px 500px at 100% 0%, rgba(124,58,237,.05), transparent 55%),
+                var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    transition: background-color .18s ease, color .18s ease; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 1.75rem 1.5rem 4rem; transition: max-width .2s ease; }
+  .page.psdWide { max-width: 1600px; }
   /* App bar */
-  .topbar { position: sticky; top: 0; z-index: 30; background: rgba(255,255,255,.82);
+  .topbar { position: sticky; top: 0; z-index: 30; background: var(--topbar-bg);
     -webkit-backdrop-filter: saturate(1.6) blur(10px); backdrop-filter: saturate(1.6) blur(10px);
     border-bottom: 1px solid var(--border); box-shadow: 0 1px 3px rgba(15,23,42,.05); }
   .topbar-inner { max-width: 1180px; margin: 0 auto; padding: .8rem 1.5rem; display: flex; align-items: center;
     justify-content: space-between; gap: 1rem 1.25rem; flex-wrap: wrap; }
   .brand { display: flex; align-items: center; gap: .8rem; min-width: 0; }
   .brand-logo { width: 42px; height: 42px; border-radius: 12px; flex: none; display: grid; place-items: center;
-    background: linear-gradient(135deg, #2563eb, #7c3aed); box-shadow: 0 6px 16px rgba(37,99,235,.35); }
+    background: linear-gradient(135deg, var(--primary), var(--accent2)); box-shadow: 0 6px 16px rgba(37,99,235,.35); }
   .brand-logo svg { width: 22px; height: 22px; display: block; }
   .brand-text h1 { margin: 0; font-size: 1.18rem; font-weight: 750; letter-spacing: -.015em; line-height: 1.15; }
   .brand-text span { display: block; font-size: .78rem; color: var(--muted); margin-top: 1px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .layout { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; align-items: start; }
   @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+  /* Editor PSD: duas sidebars fixas (esq: PSD+camadas / dir: adaptações) + centro */
+  #view-psd { grid-template-columns: 300px minmax(0, 1fr) 320px; }
+  @media (max-width: 1160px) { #view-psd { grid-template-columns: 260px minmax(0, 1fr) 290px; } }
+  /* Duas "páginas" dentro de Adaptar PSD: 1) Nomear (categoria/segmento/tag + upload + nome)
+     2) Adaptar (camadas + editores + produtos/tamanhos) — só uma visível de cada vez, pra não
+     mostrar tudo junto (o que deixava o fluxo confuso/poluído). */
+  #view-psd.psdStageNomear { grid-template-columns: minmax(0, 640px); justify-content: center; }
+  #view-psd.psdStageNomear .psdEditorCol,
+  #view-psd.psdStageNomear .psdRightCol,
+  #view-psd.psdStageNomear #psdLayersCard,
+  #view-psd.psdStageNomear #psdResumoCard { display: none; }
+  #view-psd.psdStageAdaptar #psdPageNomear { display: none; }
+  .psdResumoCard { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1rem; padding: .7rem 1rem; }
+  .psdResumoCard strong { font-size: .95rem; }
+  .psdResumoMeta { font-size: .78rem; color: var(--muted); flex-basis: 100%; }
+  .psdResumoEdit { margin-left: auto; }
+  .psdItemReg { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0; padding: .6rem .7rem;
+    border: 1px dashed var(--border); border-radius: 8px; background: var(--surface-2); }
+  .psdItemRegRow { display: flex; gap: .5rem; }
+  .psdItemRegRow > div { flex: 1; min-width: 0; }
+  .psdItemReg label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+    display: block; margin-bottom: .15rem; }
+  .psdItemReg input { width: 100%; }
+  .psdItemRegStatus { font-size: .76rem; margin: 0; min-height: 1em; }
+  .psdItemRegStatus.ok { color: var(--primary); }
+  .psdItemRegStatus.err { color: var(--danger); }
+  @media (max-width: 900px) { #view-psd { grid-template-columns: 1fr; } }
   .col { display: flex; flex-direction: column; gap: 1.5rem; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; box-shadow: var(--shadow-sm); transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
   .card h2 { margin: 0 0 1rem; font-size: 1.05rem; }
   .hidden { display: none !important; }
-  .uploadBtn { width: 100%; padding: .85rem 1rem; border: 1px dashed var(--primary); background: #eff6ff;
-    color: var(--primary); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; }
-  .uploadBtn:hover { background: #dbeafe; }
+  .uploadBtn { width: 100%; padding: .85rem 1rem; border: 1px dashed var(--primary); background: var(--tint-1);
+    color: var(--primary); border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+  .uploadBtn:hover { background: var(--tint-1-hover); }
   .origPreview { margin-top: 1rem; }
   .origPreview img { max-width: 100%; max-height: 260px; object-fit: contain; border-radius: 8px;
-    border: 1px solid var(--border); background: #f8fafc; display: block; margin: 0 auto; }
+    border: 1px solid var(--border); background: var(--surface-2); display: block; margin: 0 auto; }
   .checklist { list-style: none; margin: 0 0 1.25rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
   .sizeCat { list-style: none; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700;
     color: var(--muted); margin: .75rem 0 .35rem; }
   .sizeCat:first-child { margin-top: 0; }
   .checkItem { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border: 1px solid var(--border);
     border-radius: 8px; cursor: pointer; }
-  .checkItem:hover { border-color: var(--primary); background: #f8fafc; }
+  .checkItem:hover { border-color: var(--primary); background: var(--surface-2); }
   .checkItem input { width: 18px; height: 18px; accent-color: var(--primary); }
   .checkName { font-weight: 600; font-size: .9rem; }
   .checkDims { margin-left: auto; font-size: .8rem; color: var(--muted); }
-  .genBtn { width: 100%; padding: .9rem 1rem; border: none; background: var(--primary); color: #fff;
-    border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; }
-  .genBtn:hover:not(:disabled) { background: var(--primary-hover); }
-  .genBtn:disabled { background: #cbd5e1; cursor: not-allowed; }
+  .genBtn { width: 100%; padding: .9rem 1rem; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff;
+    border-radius: 8px; font-size: .95rem; font-weight: 600; cursor: pointer; box-shadow: 0 2px 10px rgba(37,99,235,.25); transition: transform .12s ease, box-shadow .12s ease, background .15s; }
+  .genBtn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(37,99,235,.32); }
+  .genBtn:disabled { background: var(--disabled-bg); cursor: not-allowed; }
   .note { font-size: .78rem; color: var(--muted); margin: .6rem 0 0; }
   .results { display: flex; flex-direction: column; gap: 1.25rem; }
   .resultCard { border: 1px solid var(--border); border-radius: 10px; padding: 1rem; display: flex;
@@ -71,16 +177,16 @@
   .spinner { width: 14px; height: 14px; border: 2px solid var(--border); border-top-color: var(--primary);
     border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .dlBtn { padding: .6rem .9rem; border: none; background: var(--primary); color: #fff; border-radius: 8px;
-    font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; }
-  .dlBtn:hover { background: var(--primary-hover); }
+  .dlBtn { padding: .6rem .9rem; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-hover)); color: #fff; border-radius: 8px;
+    font-size: .85rem; font-weight: 600; cursor: pointer; text-decoration: none; text-align: center; transition: transform .12s ease, box-shadow .12s ease; }
+  .dlBtn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(37,99,235,.28); }
   .placeholder { color: var(--muted); margin: 0; }
   .err { color: var(--danger); font-size: .85rem; }
-  .banner { background: #fef2f2; border: 1px solid #fecaca; color: var(--danger); border-radius: 8px;
+  .banner { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); border-radius: 8px;
     padding: .75rem 1rem; margin-top: 1rem; text-align: center; }
   /* Abas */
   /* Abas — segmented control */
-  .tabs { display: inline-flex; background: #eef1f6; border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; }
+  .tabs { display: inline-flex; background: var(--chip-bg); border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; }
   .tab { border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .88rem;
     padding: .5rem 1rem; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
   .tab:hover { color: var(--text); }
@@ -95,14 +201,14 @@
   .estCat { margin-bottom: 1.75rem; }
   .estCat h3 { margin: 0 0 .75rem; font-size: 1rem; }
   .estItem { border: 1px solid var(--border); border-radius: 10px; margin-bottom: .6rem; overflow: hidden; }
-  .estItem.done { border-color: #86efac; background: #f0fdf4; }
-  .estItem.done .estHead { background: #f0fdf4; }
-  .estItem.done .estHead:hover { background: #dcfce7; }
-  .estItem.done .covTxt { color: #16a34a; font-weight: 600; }
-  .doneHeader { display: flex; align-items: center; gap: .5rem; margin: 1.5rem 0 .75rem; font-size: .95rem; color: #16a34a; }
+  .estItem.done { border-color: var(--success-border); background: var(--success-bg); }
+  .estItem.done .estHead { background: var(--success-bg); }
+  .estItem.done .estHead:hover { background: var(--success-bg-hover); }
+  .estItem.done .covTxt { color: var(--success); font-weight: 600; }
+  .doneHeader { display: flex; align-items: center; gap: .5rem; margin: 1.5rem 0 .75rem; font-size: .95rem; color: var(--success); }
   .doneHeader svg { width: 18px; height: 18px; }
   .estHead { display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; cursor: pointer; background: var(--surface); }
-  .estHead:hover { background: #f8fafc; }
+  .estHead:hover { background: var(--surface-2); }
   .estRank { font-weight: 700; color: var(--muted); min-width: 1.5rem; }
   .estNameWrap { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; }
   .estName { font-weight: 600; }
@@ -110,19 +216,19 @@
   .iconBtn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
     border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
     cursor: pointer; text-decoration: none; padding: 0; }
-  .iconBtn:hover { color: var(--primary); border-color: var(--primary); background: #f8fafc; }
-  .iconBtn.ok { color: #16a34a; border-color: #16a34a; }
+  .iconBtn:hover { color: var(--primary); border-color: var(--primary); background: var(--surface-2); }
+  .iconBtn.ok { color: var(--success); border-color: var(--success); }
   .iconBtn svg { width: 14px; height: 14px; display: block; }
   .estCov { display: flex; align-items: center; gap: .5rem; white-space: nowrap; }
-  .covBar { width: 84px; height: 7px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
-  .covFill { display: block; height: 100%; background: #16a34a; }
+  .covBar { width: 84px; height: 7px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .covFill { display: block; height: 100%; background: var(--success); }
   .covTxt { font-size: .8rem; color: var(--muted); }
-  .covTxt b { color: #16a34a; }
+  .covTxt b { color: var(--success); }
   .estSales { font-size: .82rem; color: var(--muted); white-space: nowrap; min-width: 72px; text-align: right; }
   @media (max-width: 640px) { .estCov .covBar { display: none; } }
   .estChevron { color: var(--muted); transition: transform .15s; }
   .estItem.open .estChevron { transform: rotate(90deg); }
-  .estBody { padding: .5rem 1rem 1rem; border-top: 1px solid var(--border); background: #fbfcfe; }
+  .estBody { padding: .5rem 1rem 1rem; border-top: 1px solid var(--border); background: var(--surface-3); }
   .covGroup { margin-top: .75rem; }
   .covGroup h4 { margin: 0 0 .4rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .covList { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .4rem; }
@@ -133,18 +239,18 @@
   .covItem.miss { color: var(--muted); }
   .adaptBtn { margin-left: auto; padding: .3rem .6rem; border: none; border-radius: 6px; font-size: .75rem;
     font-weight: 600; cursor: pointer; background: var(--primary); color: #fff; }
-  .adaptBtn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+  .adaptBtn:disabled { background: var(--disabled-bg); color: var(--muted-2); cursor: not-allowed; }
   /* Adaptar por ID */
   .idbar { display: flex; gap: .5rem; margin: .75rem 0 1rem; flex-wrap: wrap; }
   .idbar .amInput { flex: 1; min-width: 200px; }
   .idGoBtn { width: auto; padding: .7rem 1.4rem; }
-  .idInfo { background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem;
+  .idInfo { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem;
     display: flex; flex-direction: column; gap: .35rem; font-size: .92rem; }
   .idLabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-right: .3rem; }
   .idCovTitle { font-size: 1rem; margin: 1.25rem 0 .5rem; }
   /* Painel Adaptar inline */
   .adaptPanel { display: none; margin-top: 1rem; padding: 1rem; border: 1px solid var(--primary);
-    border-radius: 10px; background: #eef4ff; }
+    border-radius: 10px; background: var(--tint-2); }
   .adaptPanel.open { display: block; }
   .apHead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
   .apHead strong { font-size: .95rem; }
@@ -158,36 +264,57 @@
   /* Seletor "tipo de estampa" (Localizada / Pattern) — usado nos 2 fluxos */
   .tipoField { margin: 0 0 1rem; }
   .tipoLabel { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--muted); margin-bottom: .4rem; }
-  .tipoSeg { display: inline-flex; width: 100%; background: #eef1f6; border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 3px; }
+  .tipoSeg { display: inline-flex; width: 100%; background: var(--chip-bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 3px; }
   .tipoBtn { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .85rem;
     padding: .5rem .6rem; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
   .tipoBtn:hover { color: var(--text); }
   .tipoBtn.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.14); }
   .tipoHint { font-size: .75rem; color: var(--muted); margin: .4rem 0 0; }
   /* Adaptar PSD */
+  .uploadBtn:disabled { opacity: .5; cursor: not-allowed; background: var(--disabled-bg); border-style: solid; border-color: var(--border); }
+  .psdOr { text-align: center; color: var(--muted); font-size: .78rem; margin: .6rem 0; text-transform: uppercase; letter-spacing: .05em; }
+  .psdImgBtn { border-style: solid; background: var(--surface-2); }
+  .psdImgBtn:hover:not(:disabled) { background: var(--tint-1); }
+  /* Etapa 1 — identificação da estampa (categoria/segmento/tag) */
+  .psdIdTagField { margin-top: .2rem; }
+  .psdNomeSugList { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0; }
+  .psdNomeSugBtn { text-align: left; padding: .55rem .7rem; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text); font: inherit; font-size: .88rem; cursor: pointer;
+    transition: background .12s ease, border-color .12s ease; }
+  .psdNomeSugBtn:hover { border-color: var(--primary); }
+  .psdNomeSugBtn.active { border-color: var(--primary); background: var(--tint-2); font-weight: 600; }
+  .psdNomeOk { color: var(--primary); }
   .psdLayers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .4rem; max-height: 340px; overflow: auto; }
-  .psdLayer { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-  .psdLayer.bg { background: #f1f5f9; }
+  .psdLayer { display: flex; align-items: center; gap: .6rem; padding: .45rem .6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
+  .psdLayer.bg { background: var(--layer-bg); }
+  /* Destaque: camada do elemento clicado no canvas — fácil de localizar na lista */
+  .psdLayer.active { border-color: var(--primary); background: var(--tint-1); box-shadow: 0 0 0 2px var(--primary) inset; }
+  .psdLayer.bg.active { background: var(--tint-1); }
   .psdThumb { width: 34px; height: 34px; flex: none; border-radius: 6px; border: 1px solid var(--border); object-fit: contain;
     background-color: #fff;
     background-image: linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);
     background-size: 12px 12px; background-position: 0 0,0 6px,6px -6px,-6px 0; }
   .psdLayerName { font-size: .85rem; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .psdGroupTag { display: block; font-size: .68rem; font-weight: 500; color: var(--muted); margin-top: 1px; }
-  .psdOpenFolder { color: var(--primary); border-color: var(--primary); background: #eff6ff; }
-  .psdOpenFolder:hover { background: #dbeafe; }
-  .psdSplit { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
-  .psdSplit:hover { background: #ede9fe; }
+  .psdOpenFolder { color: var(--primary); border-color: var(--primary); background: var(--tint-1); }
+  .psdOpenFolder:hover { background: var(--tint-1-hover); }
+  .psdSplit { color: var(--accent2); border-color: var(--accent2-border); background: var(--accent2-bg); }
+  .psdSplit:hover { background: var(--accent2-bg-hover); }
   .psdLayerBadge { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border: 1px solid var(--border);
     border-radius: 999px; padding: .1rem .45rem; cursor: pointer; user-select: none; }
-  .psdLayer.bg .psdLayerBadge { color: var(--primary); border-color: var(--primary); background: #eff6ff; }
+  .psdLayer.bg .psdLayerBadge { color: var(--primary); border-color: var(--primary); background: var(--tint-1); }
   .psdEye { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
     cursor: pointer; flex: none; font-size: .9rem; }
+  .psdDel { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--muted);
+    cursor: pointer; flex: none; font-size: .82rem; }
+  .psdDel:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+
   .psdEye.off { opacity: .4; }
   .psdStar { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
     cursor: pointer; flex: none; font-size: .9rem; filter: grayscale(1); opacity: .55; padding: 0; }
   .psdStar:hover { opacity: .85; }
-  .psdStar.on { filter: none; opacity: 1; border-color: #f59e0b; background: #fffbeb; }
+  .psdStar.on { filter: none; opacity: 1; border-color: var(--warn); background: var(--warn-bg); }
   .psdControls { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; }
   .psdCtl { display: flex; flex-direction: column; gap: .35rem; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .psdBtnRow { display: flex; gap: .4rem; flex-wrap: wrap; }
@@ -195,16 +322,29 @@
   .psdMiniBtn { flex: 1; padding: .55rem .5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
     border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; }
   .psdMiniBtn:hover { border-color: var(--primary); color: var(--primary); }
-  .psdMiniBtn.active { border-color: var(--primary); color: var(--primary); background: #eff6ff; }
-  .psdStageWrap { display: flex; justify-content: center; margin-top: .5rem; }
+  .psdMiniBtn.active { border-color: var(--primary); color: var(--primary); background: var(--tint-1); }
+  .psdStageWrap { display: flex; margin-top: .5rem;
+    max-width: 660px; max-height: 480px; overflow: auto; padding: 2px; border-radius: 8px; }
+  .psdStageWrap.panning { cursor: grabbing !important; user-select: none; }
+  .psdAlignBar { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-bottom: .5rem; flex-wrap: wrap; }
+  .psdZoomBar { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-bottom: .5rem; }
+  .psdZoomStep { flex: none; width: 30px; padding: .35rem 0; font-size: 1.05rem; line-height: 1; }
+  .psdZoomPct { font-size: .78rem; font-weight: 700; color: var(--muted); min-width: 3.1rem; text-align: center; }
+  .psdMiniBtn:disabled { opacity: .45; cursor: not-allowed; }
+  .psdMarquee { position: absolute; border: 1px solid var(--primary); background: rgba(37,99,235,.14); pointer-events: none; z-index: 8; }
   .psdStage { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; touch-action: none;
+    margin: auto; flex: none;
     background-color: #fff;
     background-image: linear-gradient(45deg,#c3cad6 25%,transparent 25%),linear-gradient(-45deg,#c3cad6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c3cad6 75%),linear-gradient(-45deg,transparent 75%,#c3cad6 75%);
     background-size: 22px 22px; background-position: 0 0,0 11px,11px -11px,-11px 0; }
+  :root[data-stage-bg="gray"] .psdStage { background-image: none; background-color: var(--stage-gray); }
+  :root[data-stage-bg="blue"] .psdStage { background-image: none; background-color: var(--stage-blue); }
   .psdBgLayer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
   .psdEl { position: absolute; cursor: grab; z-index: 1; outline: 1px dashed transparent; }
   .psdEl:hover { outline-color: rgba(37,99,235,.4); }
   .psdEl.sel { outline: 1.5px solid var(--primary); z-index: 5; }
+  /* Passar o mouse na camada da sidebar "acende" o elemento correspondente no canvas */
+  .psdEl.peek { box-shadow: 0 0 0 2px var(--primary), 0 0 10px 1px rgba(37,99,235,.5); z-index: 4; }
   .psdEl img { width: 100%; height: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
   .psdEl.dragging { cursor: grabbing; }
   .psdEl.ghost { pointer-events: none; outline: none; opacity: .92; z-index: 0; }
@@ -215,6 +355,15 @@
   .psdHandle { position: absolute; right: -7px; bottom: -7px; width: 15px; height: 15px; background: var(--primary);
     border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize; z-index: 6; box-shadow: 0 1px 3px rgba(0,0,0,.3); display: none; }
   .psdEl.sel .psdHandle { display: block; }
+  .psdRotateHandle { position: absolute; left: 50%; top: -22px; width: 13px; height: 13px; margin-left: -6.5px;
+    background: var(--surface); border: 2px solid var(--primary); border-radius: 50%; cursor: grab; z-index: 6; display: none; }
+  .psdRotateHandle::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 11px;
+    background: var(--primary); transform: translateX(-50%); }
+  .psdEl.sel .psdRotateHandle { display: block; }
+  .psdRotateLabel { display: inline-flex; align-items: center; gap: .25rem; font-size: .82rem; font-weight: 600; color: var(--muted); }
+  .psdRotateInput { width: 3.4rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); color: var(--text); font: inherit; font-size: .85rem; text-align: center; }
+  .psdRotateInput:disabled { opacity: .5; cursor: not-allowed; }
   /* Sidebar fixa com scroll interno e "Gerar" fixo no rodapé (só no layout de 2 colunas) */
   #view-psd .psdSideScroll { display: flex; flex-direction: column; gap: 1.5rem; }
   .psdGerarBar { padding-top: .25rem; }
@@ -225,11 +374,85 @@
     #view-psd .psdGerarBar { margin-top: auto; }
   }
   /* Blocos de editor (um por produto marcado) */
-  .psdBlock { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .psdBlock { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem; box-shadow: var(--shadow-sm); transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
   .psdBlockHead { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .75rem; }
   .psdBlockHead strong { font-size: 1rem; }
   .psdBlockHead .dims { font-size: .82rem; color: var(--muted); }
   .psdBlock .psdControls { margin-top: 1rem; }
+  /* Caixinha de replicação (sidebar direita) */
+  .repToggle { display: flex; align-items: flex-start; gap: .55rem; cursor: pointer; padding: .6rem .7rem;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, rgba(127,127,127,.06));
+    margin: 0 0 .5rem; font-size: .9rem; line-height: 1.35; user-select: none; transition: border-color .15s ease, background-color .15s ease; }
+  .repToggle:hover { border-color: var(--primary); }
+  .repToggle input { margin-top: .15rem; width: 16px; height: 16px; accent-color: var(--primary); flex: none; cursor: pointer; }
+  .repToggle.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+  /* Etiquetas primário/adaptação no cabeçalho de cada editor */
+  .psdRole { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: .12rem .5rem; border-radius: 999px; margin-left: .5rem; white-space: nowrap; }
+  .psdRole.primary { background: color-mix(in srgb, var(--primary) 20%, transparent); color: var(--primary); }
+  .psdRole.adapt { background: rgba(127,127,127,.16); color: var(--muted); }
+  .psdBlock.isPrimary { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset, var(--shadow-sm); }
+  .psdBlock.mirrored .psdStageWrap { position: relative; }
+  .psdBlock.mirrored .psdMirrorLock { position: absolute; inset: 0; z-index: 6; cursor: not-allowed;
+    background: transparent; display: flex; align-items: flex-start; justify-content: flex-end; }
+  .psdBlock:not(.mirrored) .psdMirrorLock { display: none; }
+  .psdMirrorBadge { display: none; margin: .4rem 0 0; font-size: .8rem; color: var(--muted); }
+  .psdBlock.mirrored .psdMirrorBadge { display: block; }
+  .psdBlock.mirrored .psdAlignBar, .psdBlock.mirrored .psdControls,
+  .psdBlock.mirrored .psdZoomBar > .js-zoomreset { opacity: .45; pointer-events: none; }
+  /* Linhas-guia de snapping (centro/bordas) */
+  .psdGuide { position: absolute; z-index: 8; pointer-events: none; background: #ff3b8d; box-shadow: 0 0 0 .5px rgba(255,59,141,.4); }
+  .psdGuide.v { top: 0; bottom: 0; width: 1px; transform: translateX(-.5px); }
+  .psdGuide.h { left: 0; right: 0; height: 1px; transform: translateY(-.5px); }
+
+
+  /* ===== Tema claro/escuro + polimento visual ===== */
+  .topbar-actions { display: flex; align-items: center; gap: .5rem; }
+  .themeToggle { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+    border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+    cursor: pointer; flex: none; transition: background-color .15s, border-color .15s, color .15s, transform .12s; }
+  .themeToggle:hover { color: var(--primary); border-color: var(--primary); background: var(--surface-2); }
+  .themeToggle:active { transform: scale(.92); }
+  .themeToggle svg { width: 18px; height: 18px; display: block; }
+  .themeToggle .ico-moon { display: none; }
+  :root[data-theme="dark"] .themeToggle .ico-sun { display: none; }
+  :root[data-theme="dark"] .themeToggle .ico-moon { display: block; }
+
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  .tab, .subtab, .tipoBtn, .psdMiniBtn, .iconBtn, .checkItem, .estHead, .psdLayer, .estItem,
+  .resultCard, .idInfo, .adaptPanel, .uploadBtn {
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+  }
+
+  @media (max-width: 560px) {
+    .themeToggle { width: 34px; height: 34px; }
+  }
+
+  .stageBgPicker { display: inline-flex; align-items: center; gap: .35rem; padding: 3px; border: 1px solid var(--border);
+    border-radius: 10px; background: var(--surface); }
+  .stageBgSwatch { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+    border: 2px solid transparent; border-radius: 7px; background: none; cursor: pointer; padding: 0; }
+  .stageBgSwatch .swatch { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(15,23,42,.15); display: block; }
+  .swatch-checker { background-color: #fff;
+    background-image: linear-gradient(45deg,#c3cad6 25%,transparent 25%),linear-gradient(-45deg,#c3cad6 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c3cad6 75%),linear-gradient(-45deg,transparent 75%,#c3cad6 75%);
+    background-size: 8px 8px; background-position: 0 0,0 4px,4px -4px,-4px 0; }
+  .swatch-gray { background-color: var(--stage-gray); }
+  .swatch-blue { background-color: var(--stage-blue); }
+  .stageBgSwatch:hover { border-color: var(--border); }
+  :root[data-stage-bg="checker"] .stageBgSwatch[data-bg="checker"],
+  :root[data-stage-bg="gray"] .stageBgSwatch[data-bg="gray"],
+  :root[data-stage-bg="blue"] .stageBgSwatch[data-bg="blue"] {
+    border-color: var(--primary); background: var(--tint-1);
+  }
+  @media (max-width: 560px) {
+    .stageBgPicker { display: none; }
+  }
 </style>
 
 <header class="topbar">
@@ -252,6 +475,17 @@
       <button class="tab" data-view="id">Adaptar ID</button>
       <button class="tab" data-view="adaptar">Adaptar imagem</button>
     </nav>
+    <div class="topbar-actions">
+      <div class="stageBgPicker" role="group" aria-label="Fundo do palco de edição do PSD">
+        <button type="button" class="stageBgSwatch" data-bg="checker" title="Fundo quadriculado (padrão)" aria-label="Fundo quadriculado"><span class="swatch swatch-checker"></span></button>
+        <button type="button" class="stageBgSwatch" data-bg="gray" title="Fundo cinza médio" aria-label="Fundo cinza médio"><span class="swatch swatch-gray"></span></button>
+        <button type="button" class="stageBgSwatch" data-bg="blue" title="Fundo azul médio" aria-label="Fundo azul médio"><span class="swatch swatch-blue"></span></button>
+      </div>
+      <button type="button" id="themeToggle" class="themeToggle" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -311,29 +545,76 @@
     </div>
   </div>
 
-  <div class="layout" id="view-psd">
-    <div class="col psdSideCol">
+  <div class="layout psdStageNomear" id="view-psd">
+    <div class="col psdSideCol psdLeftCol">
       <div class="psdSideScroll">
-      <div class="card">
-        <h2>1. Envie o PSD da estampa</h2>
-        <input id="psdFile" type="file" accept=".psd,image/vnd.adobe.photoshop" class="hidden" />
-        <button class="uploadBtn" id="psdPick">Selecionar arquivo .PSD</button>
-        <p class="note">A estampa é reposicionada com <strong>fidelidade total</strong> — os elementos (camadas) são reaproveitados como estão, sem IA reinterpretar a arte.</p>
-        <div id="psdStatus" class="status hidden" style="margin-top:.75rem"></div>
-        <p class="err" id="psdErr"></p>
+      <div id="psdPageNomear">
+        <div class="card" id="psdIdCard">
+          <h2>1. Identifique a estampa</h2>
+          <p class="note">Escolha categoria e segmento antes de subir o PSD — isso é usado para sugerir o nome da estampa e fica registrado no histórico junto com quem cadastrou.</p>
+          <div class="tipoField">
+            <span class="tipoLabel">Categoria</span>
+            <div class="tipoSeg" id="idCategoria">
+              <button type="button" class="tipoBtn active" data-categoria="Case">Case</button>
+              <button type="button" class="tipoBtn" data-categoria="Térmicos">Térmicos</button>
+              <button type="button" class="tipoBtn" data-categoria="Têxteis">Têxteis</button>
+            </div>
+          </div>
+          <div class="tipoField">
+            <span class="tipoLabel">Segmento</span>
+            <div class="tipoSeg" id="idSegmento">
+              <button type="button" class="tipoBtn active" data-segmento="futebol">Futebol</button>
+              <button type="button" class="tipoBtn" data-segmento="autoral">Autoral</button>
+              <button type="button" class="tipoBtn" data-segmento="licenciado">Licenciado</button>
+            </div>
+          </div>
+          <div class="tipoField psdIdTagField">
+            <span class="tipoLabel" id="idTagLabel">Time</span>
+            <select id="idTagSelect" class="amInput"></select>
+            <input id="idTagInput" class="amInput hidden" placeholder="Ex.: Flamengo" list="idTagOptions" autocomplete="off" />
+            <datalist id="idTagOptions"></datalist>
+          </div>
+          <p class="err" id="idErr"></p>
+        </div>
+
+        <div class="card">
+          <h2>2. Envie o PSD da estampa</h2>
+          <input id="psdFile" type="file" accept=".psd,image/vnd.adobe.photoshop" class="hidden" />
+          <button class="uploadBtn" id="psdPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">Selecionar arquivo .PSD</button>
+          <p class="note">A estampa é reposicionada com <strong>fidelidade total</strong> — os elementos (camadas) são reaproveitados como estão, sem IA reinterpretar a arte.</p>
+          <div id="psdStatus" class="status hidden" style="margin-top:.75rem"></div>
+          <p class="err" id="psdErr"></p>
+          <div class="psdOr">ou</div>
+          <input id="psdImgFile" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
+          <button class="uploadBtn psdImgBtn" id="psdImgPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">🖼️ Adicionar imagem (nomear sem PSD)</button>
+          <p class="note">Ainda não tem o PSD pronto? Envie só uma imagem (JPG/PNG/WEBP) da estampa pra já sugerir e registrar o nome — sem gerar adaptações.</p>
+          <p class="err" id="psdImgErr"></p>
+        </div>
+
+        <div class="card hidden" id="psdNomeCard">
+          <h2>3. Nomeie a estampa</h2>
+          <p class="note" id="psdNomeNote">Gerando sugestões de nome com IA…</p>
+          <div class="psdNomeSugList hidden" id="psdNomeSugestoes"></div>
+          <input id="psdNomeInput" class="amInput" placeholder="Nome da estampa" />
+          <button type="button" class="genBtn" id="psdNomeConfirmar" style="margin-top:.6rem" disabled>Confirmar nome e continuar</button>
+          <p class="err" id="psdNomeErr"></p>
+          <p class="status psdNomeOk hidden" id="psdNomeOk"></p>
+          <button type="button" class="psdMiniBtn" id="resyncBtn" style="margin-top:.75rem;width:100%">🔄 Reenviar pendências para a planilha</button>
+          <p class="note" id="resyncNote" style="margin-top:.4rem"></p>
+        </div>
+      </div>
+
+      <div class="card psdResumoCard hidden" id="psdResumoCard">
+        <strong id="psdResumoNome"></strong>
+        <span class="psdResumoMeta" id="psdResumoMeta"></span>
+        <button type="button" class="psdMiniBtn psdResumoEdit" id="psdResumoEditar">✏️ Editar nome/categoria</button>
       </div>
 
       <div class="card hidden" id="psdLayersCard">
-        <h2>2. Elementos detectados</h2>
+        <h2>1. Elementos detectados</h2>
         <p class="note">Marque quais camadas são <strong>fundo</strong> e quais são <strong>elementos</strong>. Clique na <strong>⭐</strong> para eleger o <strong>elemento principal</strong> — ele fica centralizado em destaque na estampa.</p>
         <ul class="psdLayers" id="psdLayers"></ul>
         <button type="button" class="psdMiniBtn" id="psdUndo" disabled style="margin-top:.75rem;width:100%">↩︎ Desfazer</button>
-      </div>
-
-      <div class="card hidden" id="psdMaskCard">
-        <h2>3. Produtos e tamanhos</h2>
-        <p class="note" style="margin-top:0">Marque um ou mais — cada produto vira um editor com seus próprios ajustes.</p>
-        <ul class="checklist" id="psdMaskList"></ul>
       </div>
       </div>
     </div>
@@ -341,6 +622,22 @@
     <div class="col psdEditorCol">
       <p class="placeholder" id="psdEditorsHint">Envie um PSD e marque um ou mais tamanhos para começar.</p>
       <div id="psdEditors"></div>
+    </div>
+
+    <div class="col psdSideCol psdRightCol">
+      <div class="psdSideScroll">
+      <div class="card hidden" id="psdMaskCard">
+        <h2>2. Produtos e tamanhos</h2>
+        <label class="repToggle" id="psdReplicateWrap" title="O primeiro tamanho marcado é o material primário. Ligado, sua composição é espelhada nas demais adaptações.">
+          <input type="checkbox" id="psdReplicate" />
+          <span><strong>Replicar o material primário</strong> para todas as adaptações</span>
+        </label>
+        <p class="note" id="psdReplicateHint" style="margin:.15rem 0 .6rem">O <strong>primeiro tamanho marcado</strong> é o primário. Ligue para espelhar a composição dele em todas as outras, sem mexer em cada uma.</p>
+        <p class="note" style="margin-top:0">Marque um ou mais — cada produto vira um editor com seus próprios ajustes.</p>
+        <ul class="checklist" id="psdMaskList"></ul>
+        <button type="button" class="genBtn hidden" id="psdDownloadAll" style="margin-top:.75rem;width:100%">⬇ Baixar todas as adaptações</button>
+      </div>
+      </div>
     </div>
   </div>
 </div>
@@ -664,10 +961,13 @@
       document.getElementById('view-estampas').classList.toggle('hidden', view !== 'estampas');
       document.getElementById('view-id').classList.toggle('hidden', view !== 'id');
       document.getElementById('view-psd').classList.toggle('hidden', view !== 'psd');
+      document.querySelector('.page').classList.toggle('psdWide', view === 'psd');
       if (view === 'estampas' && !estampasLoaded) loadEstampas();
       if (view === 'psd') ensurePsdMaskOptions();
     });
   });
+  // PSD é a aba inicial → página larga desde o começo (as duas sidebars precisam de espaço).
+  document.querySelector('.page').classList.add('psdWide');
 
   // ---- Estampas Gocase ----
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -975,6 +1275,233 @@
   document.getElementById('idGo').addEventListener('click', idBuscar);
   document.getElementById('idInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') idBuscar(); });
 
+  // ================= Etapa 0: identificação da estampa (categoria/segmento/tag) =================
+  // Escolhido ANTES do upload do PSD. Some ao contexto enviado pra IA de nomeação e ao registro
+  // gravado em /api/estampas/registrar (categoria, segmento, tag e quem fez o cadastro).
+  // Lista oficial — só estes 18 times entram no app (a planilha oficial de futebol cobre
+  // exatamente esse conjunto; qualquer outro clube fica de fora até a lista mudar).
+  const FUTEBOL_TIMES = [
+    'Atlético Mineiro', 'Bahia', 'Botafogo', 'Ceará', 'Corinthians', 'Coritiba', 'Cruzeiro',
+    'Flamengo', 'Fluminense', 'Fortaleza', 'Grêmio', 'Internacional', 'Palmeiras', 'Santos',
+    'São Paulo', 'Sport Recife', 'Vasco da Gama', 'Vitória',
+  ];
+  const LICENCIADOS = [
+    'Lilo & Stitch', 'Princesas', 'Harry Potter', 'Mickey & Amigos', 'Ursinho Pooh', 'Star Wars',
+    'Stranger Things', 'Patrulha Canina', 'Barbie', 'Snoopy', 'Toy Story', 'Sanrio',
+    'Homem-Aranha', 'Garfield', 'Rock in Rio',
+  ];
+  const idState = { categoria: 'Case', segmento: 'futebol', tag: '' };
+  const idTagMeta = {
+    // futebol usa <select> travado nos 18 times oficiais (sem texto livre — evita time
+    // fora da lista e evita grafias diferentes pro mesmo time fragmentando o SKU).
+    futebol: { label: 'Time', kind: 'select', options: FUTEBOL_TIMES },
+    autoral: { label: 'Coleção', kind: 'text', placeholder: 'Ex.: Verão 2027', options: [] },
+    licenciado: { label: 'Licenciado', kind: 'text', placeholder: 'Ex.: Harry Potter', options: LICENCIADOS },
+  };
+
+  function idApplyTagMeta() {
+    const meta = idTagMeta[idState.segmento] || idTagMeta.futebol;
+    $('idTagLabel').textContent = meta.label;
+    if (meta.kind === 'select') {
+      $('idTagSelect').innerHTML = meta.options.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      $('idTagSelect').classList.remove('hidden');
+      $('idTagInput').classList.add('hidden');
+      idState.tag = $('idTagSelect').value || '';
+    } else {
+      $('idTagInput').placeholder = meta.placeholder || '';
+      $('idTagOptions').innerHTML = meta.options.map((o) => `<option value="${esc(o)}"></option>`).join('');
+      $('idTagInput').classList.remove('hidden');
+      $('idTagSelect').classList.add('hidden');
+      idState.tag = $('idTagInput').value || '';
+    }
+  }
+
+  function idValidate() {
+    const ok = !!(idState.categoria && idState.segmento && idState.tag.trim());
+    const hint = ok ? '' : 'Escolha categoria, segmento e a tag acima primeiro';
+    $('psdPick').disabled = !ok; $('psdPick').title = hint;
+    $('psdImgPick').disabled = !ok; $('psdImgPick').title = hint;
+    return ok;
+  }
+
+  function idWireSeg(containerId, key) {
+    const el = $(containerId);
+    el.querySelectorAll('.tipoBtn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.tipoBtn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        idState[key] = btn.dataset[key];
+        if (key === 'segmento') { idApplyTagMeta(); }
+        idValidate();
+      });
+    });
+  }
+  idWireSeg('idCategoria', 'categoria');
+  idWireSeg('idSegmento', 'segmento');
+  $('idTagInput').addEventListener('input', (e) => { idState.tag = e.target.value; idValidate(); });
+  $('idTagSelect').addEventListener('change', (e) => { idState.tag = e.target.value; idValidate(); });
+  idApplyTagMeta();
+  idValidate();
+
+  // ================= Página 1 "Nomear" <-> Página 2 "Adaptar" =================
+  // Com PSD: aprovar o nome só grava o "cabeçalho" (identifier) e leva pra página de Adaptar —
+  // cada produto/tamanho vira uma linha (com seu próprio Identifier/SKU editável) só quando
+  // baixado. Sem PSD ("Adicionar imagem"): não há o que adaptar, já registra tudo na hora.
+  let psdNomeRegistrado = false;
+  let psdNomeIsPsd = false;
+  let psdIdCurrentFile = '';
+  let NOME = null; // { registroId, categoria, segmento, tag, nome, identifier, userName }
+
+  function psdSetStage(stage) {
+    const view = $('view-psd');
+    view.classList.toggle('psdStageNomear', stage === 'nomear');
+    view.classList.toggle('psdStageAdaptar', stage === 'adaptar');
+  }
+
+  function psdNomeReset() {
+    psdNomeRegistrado = false;
+    $('psdNomeCard').classList.remove('hidden');
+    $('psdNomeNote').textContent = 'Gerando sugestões de nome com IA…';
+    $('psdNomeSugestoes').classList.add('hidden');
+    $('psdNomeSugestoes').innerHTML = '';
+    $('psdNomeInput').value = '';
+    $('psdNomeConfirmar').disabled = true;
+    $('psdNomeConfirmar').textContent = psdNomeIsPsd ? 'Confirmar nome e continuar' : 'Confirmar nome e registrar';
+    $('psdNomeErr').textContent = '';
+    $('psdNomeOk').classList.add('hidden');
+  }
+  function psdNomeRenderSugestoes(nomes) {
+    const wrap = $('psdNomeSugestoes');
+    wrap.innerHTML = '';
+    nomes.forEach((n) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'psdNomeSugBtn'; b.textContent = n;
+      b.addEventListener('click', () => {
+        wrap.querySelectorAll('.psdNomeSugBtn').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        $('psdNomeInput').value = n;
+        $('psdNomeConfirmar').disabled = false;
+      });
+      wrap.appendChild(b);
+    });
+    wrap.classList.remove('hidden');
+    if (nomes[0]) { $('psdNomeInput').value = nomes[0]; wrap.firstChild.classList.add('active'); }
+    $('psdNomeConfirmar').disabled = !$('psdNomeInput').value.trim();
+  }
+  async function psdIniciarNomeacao(psdCanvas, fileName, isPsd) {
+    psdNomeIsPsd = isPsd;
+    NOME = null;
+    psdNomeReset();
+    try {
+      const imageBase64 = toDisp(psdCanvas, 900);
+      const r = await fetch('/api/estampas/gerar-nome', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ imageBase64, categoria: idState.categoria, segmento: idState.segmento, tag: idState.tag }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      $('psdNomeNote').textContent = 'Escolha uma sugestão ou edite o nome abaixo:';
+      psdNomeRenderSugestoes(j.nomes || []);
+    } catch (err) {
+      $('psdNomeNote').textContent = 'Não consegui gerar sugestões automáticas — digite o nome manualmente:';
+      $('psdNomeConfirmar').disabled = false;
+    }
+    psdIdCurrentFile = fileName;
+  }
+  $('psdNomeInput').addEventListener('input', () => {
+    $('psdNomeConfirmar').disabled = !$('psdNomeInput').value.trim();
+  });
+
+  function psdAtualizarResumo() {
+    if (!NOME) return;
+    $('psdResumoNome').textContent = NOME.nome;
+    $('psdResumoMeta').textContent =
+      `${NOME.categoria} · ${NOME.segmento}${NOME.tag ? ' · ' + NOME.tag : ''} · Identifier: ${NOME.identifier}`;
+    $('psdResumoCard').classList.remove('hidden');
+  }
+
+  $('psdNomeConfirmar').addEventListener('click', async () => {
+    const nome = $('psdNomeInput').value.trim();
+    if (!nome) return;
+    $('psdNomeErr').textContent = '';
+    $('psdNomeConfirmar').disabled = true;
+    $('psdNomeConfirmar').textContent = 'Salvando…';
+    try {
+      const r = await fetch('/api/estampas/aprovar-nome', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          registroId: NOME ? NOME.registroId : undefined,
+          categoria: idState.categoria, segmento: idState.segmento, tag: idState.tag,
+          nome, arquivoNome: psdIdCurrentFile, temAdaptacao: psdNomeIsPsd,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      psdNomeRegistrado = true;
+      NOME = {
+        registroId: j.registroId, categoria: idState.categoria, segmento: idState.segmento,
+        tag: idState.tag, nome, identifier: j.identifier, userName: j.userName,
+      };
+      psdAtualizarResumo();
+      psdRefreshItemDefaults();
+      if (psdNomeIsPsd) {
+        $('psdNomeConfirmar').textContent = '✅ Nome aprovado';
+        psdSetStage('adaptar');
+      } else {
+        $('psdNomeConfirmar').textContent = '✅ Registrado';
+        $('psdNomeConfirmar').disabled = false;
+        $('psdNomeOk').classList.remove('hidden');
+        const quem = j.userName ? ` por ${j.userName}` : '';
+        const skuTxt = j.sku ? ` · SKU ${j.sku}` : '';
+        let msg = j.sheetSynced
+          ? `Estampa "${nome}" registrada${quem}${skuTxt} e sincronizada com a planilha.`
+          : `Estampa "${nome}" registrada${quem}${skuTxt}. Ainda não sincronizou com a planilha` +
+            (j.sheetError ? ` (${j.sheetError})` : '') + ' — o histórico local já guardou o registro.';
+        if (j.oficialFutebol) {
+          msg += j.oficialFutebol.synced
+            ? ' Também sincronizado com a planilha oficial de Futebol.'
+            : ` Planilha oficial de Futebol ainda pendente${j.oficialFutebol.error ? ` (${j.oficialFutebol.error})` : ''}.`;
+        }
+        $('psdNomeOk').textContent = msg;
+      }
+    } catch (err) {
+      $('psdNomeConfirmar').disabled = false;
+      $('psdNomeConfirmar').textContent = psdNomeIsPsd ? 'Confirmar nome e continuar' : 'Confirmar nome e registrar';
+      $('psdNomeErr').textContent = 'Não consegui registrar: ' + err.message;
+    }
+  });
+
+  $('psdResumoEditar').addEventListener('click', () => {
+    $('psdNomeConfirmar').disabled = !$('psdNomeInput').value.trim();
+    $('psdNomeConfirmar').textContent = 'Confirmar nome e continuar';
+    $('psdNomeOk').classList.add('hidden');
+    psdSetStage('nomear');
+  });
+
+  $('resyncBtn').addEventListener('click', async () => {
+    $('resyncBtn').disabled = true;
+    $('resyncNote').textContent = 'Reenviando…';
+    try {
+      const r = await fetch('/api/estampas/resync-planilha', { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      let msg = j.tentativas === 0
+        ? 'Nada pendente — tudo já sincronizado.'
+        : `${j.ok}/${j.tentativas} registro(s) sincronizado(s) com a planilha.` +
+          (j.erros && j.erros.length ? ` ${j.erros.length} ainda falharam.` : '');
+      const of = j.oficialFutebol;
+      if (of && of.tentativas > 0) {
+        msg += ` Planilha oficial de Futebol: ${of.ok}/${of.tentativas} linha(s) sincronizada(s)` +
+          (of.erros && of.erros.length ? `, ${of.erros.length} ainda falharam.` : '.');
+      }
+      $('resyncNote').textContent = msg;
+    } catch (err) {
+      $('resyncNote').textContent = 'Erro ao reenviar: ' + err.message;
+    } finally {
+      $('resyncBtn').disabled = false;
+    }
+  });
+
   // ================= Adaptar PSD (100% fiel, sem IA) =================
   // Lê o PSD no navegador (ag-psd), separa as camadas em "fundo" (fixo) e
   // "elementos" (móveis) e monta uma composição no tamanho exato da máscara.
@@ -985,7 +1512,56 @@
   let psdMaskReady = false;
   // Cada produto marcado vira um "editor" independente (bloco com prévia + próprios controles).
   let editors = [];       // { maskIdx, S:{tipo,bgMode,rapport,arrangeMode,overlap,cols}, dom, canvas }
+  let activeEditor = null; // último editor com um elemento selecionado (p/ atalhos globais)
+  let layerRows = new Map(); // el -> <li> da sidebar de camadas, p/ destacar ao selecionar no canvas
+  let psdClipboard = []; // camadas copiadas (Ctrl+C) para colar (Ctrl+V) — pode ter várias
+  let spaceDown = false;   // barra de espaço pressionada → arrastar no palco navega (pan) em vez de selecionar
   const isSpanning = (e) => !!PSD && e.ow >= PSD.pw * 0.85 && e.oh >= PSD.ph * 0.85;  // camada ~full-canvas
+
+  // Identifier/SKU sugeridos por item (produto/tamanho) — espelha o slugify do servidor.
+  function slugifyJs(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'item';
+  }
+  // Mesmo mapeamento produto -> planilha oficial de Futebol usado no servidor (mantenha em
+  // sincronia com PRODUTO_KEY_TO_OFICIAL em src/server.ts).
+  const PRODUTO_KEY_TO_OFICIAL_FUTEBOL = {
+    'garrafa-fresh': { label: 'Fresh', code: 'gf' },
+    'garrafa-urban': { label: 'Urban', code: 'gu' },
+    'garrafa-mini': { label: 'Mini', code: 'gm' },
+    'copo-life': { label: 'Life', code: 'cl' },
+    'copo-vibe': { label: 'Cerveja', code: 'ct' },
+    'garrafa-flip': { label: 'Flip Pro', code: 'gfp' },
+    'garrafa-magsafe': { label: 'Magsafe', code: 'gms' },
+  };
+  // Sugestão de Identifier/SKU pra um produto/tamanho — editável antes de baixar/registrar.
+  // Térmicos+Futebol com produto mapeado segue o padrão real da planilha oficial (identifier
+  // com sufixo "-termicos", SKU com o código curto do modelo); os demais casos usam
+  // "<identifier> - <produto>", no mesmo espírito do SKU de item único (Case) já combinado.
+  function defaultItemIdSku(mk) {
+    if (!NOME) return { identifier: '', sku: '' };
+    const base = NOME.identifier;
+    const oficial = (NOME.categoria === 'Térmicos' && NOME.segmento === 'futebol')
+      ? PRODUTO_KEY_TO_OFICIAL_FUTEBOL[mk.key] : null;
+    if (oficial) return { identifier: `${base}-termicos`, sku: `${base}-${oficial.code}` };
+    return { identifier: base, sku: `${base} - ${slugifyJs(mk.label)}` };
+  }
+  // Reaplica a sugestão em blocos já abertos (ex.: o 1º editor, criado antes de aprovar o
+  // nome) — só nos campos que o usuário ainda não editou manualmente.
+  function psdRefreshItemDefaults() {
+    editors.forEach((ed) => {
+      if (!ed.dom || !ed.dom.itemIdEl) return;
+      const mk = PSD_MASKS[ed.maskIdx];
+      const d = defaultItemIdSku(mk);
+      const touched = ed.itemTouched || {};
+      if (!touched.id) ed.dom.itemIdEl.value = d.identifier;
+      if (!touched.sku) ed.dom.itemSkuEl.value = d.sku;
+    });
+  }
 
   // Carrega o leitor de PSD sob demanda (bundle grande — só quando precisa).
   let agPsdLoad = null;
@@ -1059,6 +1635,7 @@
       renderPsdLayers();
       $('psdLayersCard').classList.remove('hidden');
       $('psdMaskCard').classList.remove('hidden');
+      psdIniciarNomeacao(psd.canvas, f.name, true); // sugere o nome (não bloqueia o resto do fluxo); ao aprovar, vai pra "Adaptar"
       await ensurePsdMaskOptions();
       // marca o 1º tamanho por padrão p/ já mostrar um editor
       editors = []; $('psdEditors').innerHTML = '';
@@ -1069,6 +1646,38 @@
       psdSetStatus('');
       psdShowErr('Não consegui ler o PSD: ' + err.message);
     }
+  });
+
+  // "Adicionar imagem" — mesma nomeação, mas sem PSD (não gera adaptações, sem camadas/checklist
+  // de produtos) — ao aprovar o nome, já registra na hora (não há etapa de Adaptar a esperar).
+  function fileToCanvas(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        cv.getContext('2d').drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve(cv);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('arquivo de imagem inválido')); };
+      img.src = url;
+    });
+  }
+  $('psdImgPick').addEventListener('click', () => $('psdImgFile').click());
+  $('psdImgFile').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    $('psdImgErr').textContent = '';
+    try {
+      const canvas = await fileToCanvas(f);
+      psdIniciarNomeacao(canvas, f.name, false);
+      $('psdNomeCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+      $('psdImgErr').textContent = 'Não consegui ler a imagem: ' + err.message;
+    }
+    e.target.value = '';
   });
 
   // Junta as folhas (camadas raster) de um grupo num único canvas no bbox do grupo.
@@ -1190,6 +1799,77 @@
   }
   $('psdUndo').addEventListener('click', undoLastSplit);   // (o listener havia sumido no refactor dos blocos)
 
+  // Exclui uma camada (fundo ou elemento). Reaproveita a pilha de "Desfazer" existente:
+  // registra a operação como "el vira []" — undoLastSplit sabe recolocar o original de volta.
+  function deleteLayer(el) {
+    if (!PSD) return;
+    const idx = PSD.elements.indexOf(el);
+    if (idx < 0) return;
+    PSD.elements.splice(idx, 1);
+    if (PSD.starEl === el) PSD.starEl = null;
+    psdClipboard = psdClipboard.filter((c) => c !== el);
+    editors.forEach((ed) => { ed.selSet.delete(el); });
+    pushHistory(el, []);
+    renderPsdLayers();
+    refreshAllBlocks();
+  }
+  // Exclui todas as camadas selecionadas no editor ativo (um passo de "Desfazer" por camada).
+  function deleteSelected(ed) {
+    if (!ed || !ed.selSet.size) return;
+    for (const el of Array.from(ed.selSet)) deleteLayer(el);
+  }
+
+  // Clona os dados de uma camada (mesmo canvas, nova identidade) para "colar" como elemento novo.
+  function cloneElement(el) {
+    return {
+      name: el.name + ' cópia', canvas: el.canvas, ox: el.ox, oy: el.oy, ow: el.ow, oh: el.oh,
+      isBg: el.isBg, visible: el.visible, dispSrc: el.dispSrc, t: null,
+      group: el.group, isFolder: el.isFolder, kids: el.kids,
+    };
+  }
+  // Ctrl+C — guarda as camadas selecionadas no editor ativo.
+  function copySelected() {
+    if (activeEditor && activeEditor.selSet.size) psdClipboard = Array.from(activeEditor.selSet);
+  }
+  // Ctrl+V — insere uma cópia de cada camada copiada logo após a original (ou no fim, se a
+  // original já não existir mais), e seleciona só as cópias novas.
+  function pasteClipboard() {
+    if (!PSD || !psdClipboard.length) return;
+    const clones = [];
+    for (const orig of psdClipboard) {
+      const idx = PSD.elements.indexOf(orig);
+      const clone = cloneElement(orig);
+      if (idx >= 0) PSD.elements.splice(idx + 1, 0, clone); else PSD.elements.push(clone);
+      clones.push(clone);
+    }
+    renderPsdLayers();
+    refreshAllBlocks();
+    if (activeEditor) edSetSelection(activeEditor, clones.filter((c) => activeEditor.nodes.has(c)));
+  }
+  // Atalhos globais: Delete/Backspace exclui a camada selecionada; Ctrl/Cmd+C e Ctrl/Cmd+V
+  // copiam/colam. Ignorado quando o foco está num campo de texto (inputs continuam com o
+  // copiar/colar normal do navegador).
+  document.addEventListener('keydown', (ev) => {
+    const tag = (ev.target && ev.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea' || (ev.target && ev.target.isContentEditable);
+    if (typing) return;
+    const mod = ev.ctrlKey || ev.metaKey;
+    if (mod && (ev.key === 'c' || ev.key === 'C')) {
+      if (activeEditor && activeEditor.selSet.size) { copySelected(); ev.preventDefault(); }
+      return;
+    }
+    if (mod && (ev.key === 'v' || ev.key === 'V')) {
+      if (psdClipboard.length) { pasteClipboard(); ev.preventDefault(); }
+      return;
+    }
+    if (ev.key === 'Delete' || ev.key === 'Backspace') {
+      if (activeEditor && activeEditor.selSet.size) { deleteSelected(activeEditor); ev.preventDefault(); }
+      return;
+    }
+    if (ev.code === 'Space' && !spaceDown) { spaceDown = true; ev.preventDefault(); }
+  });
+  document.addEventListener('keyup', (ev) => { if (ev.code === 'Space') spaceDown = false; });
+
   // "Abre" uma pasta: troca o elemento-pasta pelos seus filhos, como elementos independentes,
   // PRESERVANDO a posição/escala visual atual (nada se move ao abrir). Pastas aninhadas viram
   // sub-pastas abríveis de novo. Um filho que cobre a pasta pode ser marcado fundo normalmente.
@@ -1292,8 +1972,34 @@
     renderPsdLayers(); refreshAllBlocks();
   }
 
+  // Acende (ou apaga) o elemento no(s) canvas ao passar o mouse na camada correspondente da sidebar.
+  function peekElement(el, on) {
+    editors.forEach((ed) => {
+      const rec = ed.nodes && ed.nodes.get(el);
+      if (rec) rec.node.classList.toggle('peek', on);
+    });
+  }
+  // Clicou na camada (sidebar) → seleciona o elemento de verdade no(s) canvas (em todos os editores
+  // onde ele existe). Fica selecionado (alça + contorno) até o usuário clicar em outra coisa — não
+  // é um efeito passageiro do hover.
+  function selectElementEverywhere(el) {
+    editors.forEach((ed) => {
+      if (ed.nodes && ed.nodes.has(el)) edSetSelection(ed, [el]);
+    });
+  }
+  // Destaca na sidebar a(s) camada(s) do(s) elemento(s) selecionado(s) no canvas — e rola até a primeira.
+  function highlightLayerRows(elSet) {
+    let first = null;
+    layerRows.forEach((li, el) => {
+      const on = !!elSet && elSet.has(el);
+      li.classList.toggle('active', on);
+      if (on && !first) first = li;
+    });
+    if (first) first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   function renderPsdLayers() {
     const ul = $('psdLayers'); ul.innerHTML = '';
+    layerRows = new Map();
     // exibe do topo para baixo (inverso do z-order) — mais intuitivo
     PSD.elements.slice().reverse().forEach((el) => {
       const li = document.createElement('li');
@@ -1306,7 +2012,8 @@
         (!el.isFolder && !el.isBg ? `<button class="psdLayerBadge psdSplit" title="Separar motivos que estão juntos nesta camada (ilhas de pixels)">separar</button>` : '') +
         `<span class="psdLayerBadge psdKind">${el.isBg ? 'fundo' : 'elemento'}</span>` +
         (!el.isBg ? `<button class="psdStar${PSD.starEl === el ? ' on' : ''}" title="Elemento principal (centralizado em destaque)">⭐</button>` : '') +
-        `<button class="psdEye" title="Mostrar/ocultar">👁</button>`;
+        `<button class="psdEye" title="Mostrar/ocultar">👁</button>` +
+        `<button class="psdDel" title="Excluir camada">🗑</button>`;
       const starBtn = li.querySelector('.psdStar');
       if (starBtn) starBtn.addEventListener('click', () => {
         PSD.starEl = (PSD.starEl === el) ? null : el;
@@ -1330,8 +2037,19 @@
         eye.classList.toggle('off', !el.visible);
         refreshAllBlocks();
       });
+      const delBtn = li.querySelector('.psdDel');
+      delBtn.addEventListener('click', () => deleteLayer(el));
+      li.addEventListener('mouseenter', () => peekElement(el, true));
+      li.addEventListener('mouseleave', () => peekElement(el, false));
+      li.addEventListener('click', (ev) => {
+        if (ev.target.closest('button')) return; // não rouba o clique de ⭐/pasta/separar/👁/🗑
+        selectElementEverywhere(el);
+      });
+      layerRows.set(el, li);
       ul.appendChild(li);
     });
+    // preserva o destaque (elemento já selecionado no canvas) mesmo após reconstruir a lista
+    highlightLayerRows(activeEditor ? activeEditor.selSet : null);
   }
 
   function fgElements() { return PSD.elements.filter((e) => e.visible && !e.isBg); }
@@ -1458,6 +2176,16 @@
 
   // Compõe (no tamanho EXATO) a partir do layout ATUAL do editor (respeita arrastes). Fundo sempre
   // TRANSPARENTE. Estilo Estrela → desenha só o principal. Pattern → desenha todos + rapport (±largura).
+  // Desenha uma camada respeitando a rotação (gira em torno do próprio centro, como no CSS).
+  function drawRotated(ctx, canvas, t, dx, dy) {
+    const rot = t.rot || 0;
+    if (!rot) { ctx.drawImage(canvas, t.x + dx, t.y + dy, t.w, t.h); return; }
+    ctx.save();
+    ctx.translate(t.x + dx + t.w / 2, t.y + dy + t.h / 2);
+    ctx.rotate(rot * Math.PI / 180);
+    ctx.drawImage(canvas, -t.w / 2, -t.h / 2, t.w, t.h);
+    ctx.restore();
+  }
   function composeFrom(ed) {
     const mk = PSD_MASKS[ed.maskIdx], W = mk.w, H = mk.h, S = ed.S, L = ed.layout;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -1466,8 +2194,8 @@
     const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
     for (const e of els) {
       const t = L.T.get(e); if (!t) continue;
-      ctx.drawImage(e.canvas, t.x, t.y, t.w, t.h);
-      for (const o of wraps) ctx.drawImage(e.canvas, t.x + o.dx, t.y + o.dy, t.w, t.h);
+      drawRotated(ctx, e.canvas, t, 0, 0);
+      for (const o of wraps) drawRotated(ctx, e.canvas, t, o.dx, o.dy);
     }
     return cv;
   }
@@ -1486,54 +2214,140 @@
     if (!t || !rec) return;
     const put = (node, dx, dy) => { if (!node) return;
       node.style.left = ((t.x + dx) * ed.disp) + 'px'; node.style.top = ((t.y + dy) * ed.disp) + 'px';
-      node.style.width = (t.w * ed.disp) + 'px'; node.style.height = (t.h * ed.disp) + 'px'; };
+      node.style.width = (t.w * ed.disp) + 'px'; node.style.height = (t.h * ed.disp) + 'px';
+      node.style.transform = 'rotate(' + (t.rot || 0) + 'deg)'; };
     put(rec.node, 0, 0);
     rec.ghosts.forEach((g) => put(g, Number(g.dataset.dx) || 0, Number(g.dataset.dy) || 0));
   }
-  function edSelect(ed, e) {
-    if (ed.sel) { const r = ed.nodes.get(ed.sel); if (r) r.node.classList.remove('sel'); }
-    ed.sel = e;
-    if (e) { const r = ed.nodes.get(e); if (r) r.node.classList.add('sel'); }
+  // ===== Seleção múltipla por editor (ed.selSet) =====
+  function edApplySelClasses(ed) {
+    ed.nodes.forEach((rec, el) => rec.node.classList.toggle('sel', ed.selSet.has(el)));
+    if (ed.dom && ed.dom.alignBtns) ed.dom.alignBtns.forEach((b) => { b.disabled = ed.selSet.size === 0; });
+    if (ed.dom && ed.dom.rotControls) {
+      ed.dom.rotControls.forEach((c) => { c.disabled = ed.selSet.size === 0; });
+      if (ed.dom.rotInput) {
+        const first = ed.selSet.values().next().value;
+        const t = first && ed.layout ? ed.layout.T.get(first) : null;
+        ed.dom.rotInput.value = t ? Math.round(t.rot || 0) : 0;
+      }
+    }
+    // Clicou num elemento do canvas → acende a camada correspondente na sidebar, pra localizar fácil.
+    highlightLayerRows(ed.selSet);
+  }
+  function edSetSelection(ed, arr) {
+    ed.selSet = new Set(arr);
+    edApplySelClasses(ed);
+    if (ed.selSet.size) activeEditor = ed;
+  }
+  function edToggleInSelection(ed, el) {
+    if (ed.selSet.has(el)) ed.selSet.delete(el); else ed.selSet.add(el);
+    edApplySelClasses(ed);
+    if (ed.selSet.size) activeEditor = ed;
+  }
+  function edClearSelection(ed) { ed.selSet.clear(); edApplySelClasses(ed); }
+  // Restaura a seleção após um re-render (zoom, relayout…) sem "roubar" o editor ativo.
+  function edRestoreSelection(ed, arr) {
+    ed.selSet = new Set(arr.filter((el) => ed.nodes.has(el)));
+    edApplySelClasses(ed);
+  }
+  // Botões "Centralizar H/V": centraliza cada camada selecionada, individualmente, no espaço da máscara.
+  function centerSelection(ed, axis) {
+    if (!ed.selSet.size) return;
+    const mk = PSD_MASKS[ed.maskIdx];
+    ed.selSet.forEach((el) => {
+      const t = ed.layout.T.get(el); if (!t) return;
+      if (axis === 'h') t.x = (mk.w - t.w) / 2; else t.y = (mk.h - t.h) / 2;
+      edPositionEl(ed, el);
+    });
+    syncIfPrimary(ed, false);
+  }
+  // Aplica um ângulo (graus) a todas as camadas selecionadas — cada uma gira em torno do próprio centro.
+  function applyRotation(ed, deg) {
+    if (!ed.selSet.size) return;
+    ed.selSet.forEach((el) => {
+      const t = ed.layout.T.get(el); if (!t) return;
+      t.rot = deg;
+      edPositionEl(ed, el);
+    });
+    syncIfPrimary(ed, false);
   }
   function edAttachDrag(ed, node, e) {
     const handle = node.querySelector('.psdHandle');
     node.addEventListener('pointerdown', (ev) => {
       if (ev.target === handle) return;
-      ev.preventDefault(); edSelect(ed, e);
+      ev.preventDefault();
+      if (ev.shiftKey || ev.ctrlKey || ev.metaKey) { edToggleInSelection(ed, e); return; }   // só alterna, não arrasta
+      const already = ed.selSet.has(e);
+      if (!already || ed.selSet.size <= 1) edSetSelection(ed, [e]);
+      // se já era parte de uma seleção múltipla, mantém o grupo pra arrastar todos juntos
       node.classList.add('dragging'); try { node.setPointerCapture(ev.pointerId); } catch {}
-      const t = ed.layout.T.get(e), sx = ev.clientX, sy = ev.clientY, ox = t.x, oy = t.y;
-      const move = (m) => { t.x = ox + (m.clientX - sx) / ed.disp; t.y = oy + (m.clientY - sy) / ed.disp; edPositionEl(ed, e); };
+      const moving = (ed.selSet.has(e) && ed.selSet.size > 1) ? Array.from(ed.selSet) : [e];
+      const starts = moving.map((el) => { const t = ed.layout.T.get(el); return { el, t, ox: t.x, oy: t.y }; });
+      const sx = ev.clientX, sy = ev.clientY;
+      const move = (m) => {
+        let dx = (m.clientX - sx) / ed.disp, dy = (m.clientY - sy) / ed.disp;
+        const snapped = snapDrag(ed, e, starts, dx, dy); dx = snapped.dx; dy = snapped.dy;
+        starts.forEach((s) => { s.t.x = s.ox + dx; s.t.y = s.oy + dy; edPositionEl(ed, s.el); });
+        syncIfPrimary(ed, true);
+      };
       const up = () => {
         node.classList.remove('dragging');
-        if (ed.S.tipo === 'pattern') { const W = PSD_MASKS[ed.maskIdx].w; let cx = t.x + t.w / 2; cx = ((cx % W) + W) % W; t.x = cx - t.w / 2; edPositionEl(ed, e); }
+        clearGuides(ed);
+        if (ed.S.tipo === 'pattern') {
+          const W = PSD_MASKS[ed.maskIdx].w;
+          starts.forEach((s) => { let cx = s.t.x + s.t.w / 2; cx = ((cx % W) + W) % W; s.t.x = cx - s.t.w / 2; edPositionEl(ed, s.el); });
+        }
+        syncIfPrimary(ed, false);
         node.removeEventListener('pointermove', move); node.removeEventListener('pointerup', up);
       };
       node.addEventListener('pointermove', move); node.addEventListener('pointerup', up);
     });
     handle.addEventListener('pointerdown', (ev) => {
-      ev.preventDefault(); ev.stopPropagation(); edSelect(ed, e);
+      ev.preventDefault(); ev.stopPropagation(); edSetSelection(ed, [e]);
       try { handle.setPointerCapture(ev.pointerId); } catch {}
       const t = ed.layout.T.get(e), sx = ev.clientX, ow = t.w, oh = t.h, ratio = oh / ow, cx = t.x, cy = t.y;
       const move = (m) => { const w = Math.max(20, ow + (m.clientX - sx) / ed.disp), h = w * ratio;
-        t.w = w; t.h = h; t.x = cx + (ow - w) / 2; t.y = cy + (oh - h) / 2; edPositionEl(ed, e); };
-      const up = () => { handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
+        t.w = w; t.h = h; t.x = cx + (ow - w) / 2; t.y = cy + (oh - h) / 2; edPositionEl(ed, e); syncIfPrimary(ed, true); };
+      const up = () => { syncIfPrimary(ed, false); handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); };
       handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up);
+    });
+    // Pontinho de rotação: arraste em volta do elemento para girar 360° livremente (Shift = passos de 15°).
+    const rotateHandle = node.querySelector('.psdRotateHandle');
+    rotateHandle.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); edSetSelection(ed, [e]);
+      try { rotateHandle.setPointerCapture(ev.pointerId); } catch {}
+      const t = ed.layout.T.get(e);
+      const move = (m) => {
+        const rect = node.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+        let deg = Math.atan2(m.clientY - cy, m.clientX - cx) * 180 / Math.PI + 90;
+        deg = ((deg % 360) + 360) % 360;
+        if (m.shiftKey) deg = Math.round(deg / 15) * 15 % 360;
+        t.rot = deg;
+        edPositionEl(ed, e);
+        if (ed.dom.rotInput) ed.dom.rotInput.value = Math.round(deg);
+        syncIfPrimary(ed, true);
+      };
+      const up = () => { syncIfPrimary(ed, false); rotateHandle.removeEventListener('pointermove', move); rotateHandle.removeEventListener('pointerup', up); };
+      rotateHandle.addEventListener('pointermove', move); rotateHandle.addEventListener('pointerup', up);
     });
   }
   // renderiza o stage do editor a partir de ed.layout (fundo transparente; mantém os arrastes atuais)
   function edRenderStage(ed) {
     const mk = PSD_MASKS[ed.maskIdx], S = ed.S, L = ed.layout;
-    const disp = Math.min(660 / mk.w, 480 / mk.h); ed.disp = disp;
+    const baseDisp = Math.min(660 / mk.w, 480 / mk.h);
+    const disp = baseDisp * (ed.zoom || 1); ed.disp = disp;
     const dW = Math.round(mk.w * disp), dH = Math.round(mk.h * disp);
     const stage = ed.dom.stage;
     stage.style.width = dW + 'px'; stage.style.height = dH + 'px';
-    stage.innerHTML = ''; ed.nodes = new Map(); ed.sel = null;
+    const prevSelArr = Array.from(ed.selSet);
+    stage.innerHTML = ''; ed.nodes = new Map(); ed.selSet = new Set();
     const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
     const els = L.onlyStar ? [L.star] : fgElements();
     for (const e of els) {
       const t = L.T.get(e); if (!t) continue;
       const d = document.createElement('div'); d.className = 'psdEl';
-      d.innerHTML = `<img src="${e.dispSrc}" alt=""><span class="psdHandle"></span>`;
+      d.innerHTML = `<img src="${e.dispSrc}" alt=""><span class="psdRotateHandle" title="Girar"></span><span class="psdHandle"></span>`;
       const rec = { node: d, ghosts: [] };
       ed.nodes.set(e, rec); edAttachDrag(ed, d, e); stage.appendChild(d);
       for (const o of wraps) {
@@ -1543,30 +2357,163 @@
       }
       edPositionEl(ed, e);
     }
-    stage.onpointerdown = (ev) => { if (ev.target === stage) edSelect(ed, null); };
+    stage.onpointerdown = (ev) => {
+      if (ev.target !== stage) return;   // só quando o clique começa em área vazia (fora de uma camada)
+      const wrap = ed.dom.wrap;
+      if (spaceDown) {   // espaço + arrastar → navega (pan), sem mexer na seleção
+        const sx = ev.clientX, sy = ev.clientY, sl = wrap.scrollLeft, st = wrap.scrollTop;
+        try { stage.setPointerCapture(ev.pointerId); } catch {}
+        wrap.classList.add('panning');
+        const move = (m) => { wrap.scrollLeft = sl - (m.clientX - sx); wrap.scrollTop = st - (m.clientY - sy); };
+        const up = () => { wrap.classList.remove('panning'); stage.removeEventListener('pointermove', move); stage.removeEventListener('pointerup', up); };
+        stage.addEventListener('pointermove', move); stage.addEventListener('pointerup', up);
+        return;
+      }
+      // arrastar em área vazia → retângulo de seleção (marquee); Shift/Ctrl soma à seleção atual.
+      // um clique simples, sem arrastar, continua desselecionando tudo (como antes).
+      const rect = stage.getBoundingClientRect();
+      const startX = ev.clientX - rect.left, startY = ev.clientY - rect.top;
+      const additive = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+      const baseSel = additive ? new Set(ed.selSet) : new Set();
+      let dragged = false, box = null;
+      try { stage.setPointerCapture(ev.pointerId); } catch {}
+      const move = (m) => {
+        const curX = m.clientX - rect.left, curY = m.clientY - rect.top;
+        if (!dragged && Math.hypot(curX - startX, curY - startY) > 4) {
+          dragged = true; box = document.createElement('div'); box.className = 'psdMarquee'; stage.appendChild(box);
+        }
+        if (!dragged) return;
+        const x = Math.min(startX, curX), y = Math.min(startY, curY), w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+        box.style.left = x + 'px'; box.style.top = y + 'px'; box.style.width = w + 'px'; box.style.height = h + 'px';
+        const sel = new Set(baseSel);
+        ed.nodes.forEach((rec, el) => {
+          const t = ed.layout.T.get(el); if (!t) return;
+          const ex = t.x * ed.disp, ey = t.y * ed.disp, ew = t.w * ed.disp, eh = t.h * ed.disp;
+          if (ex < x + w && ex + ew > x && ey < y + h && ey + eh > y) sel.add(el);
+        });
+        edSetSelection(ed, Array.from(sel));
+      };
+      const up = () => {
+        if (box) box.remove();
+        stage.removeEventListener('pointermove', move); stage.removeEventListener('pointerup', up);
+        if (!dragged) edClearSelection(ed);
+      };
+      stage.addEventListener('pointermove', move); stage.addEventListener('pointerup', up);
+    };
+    edRestoreSelection(ed, prevSelArr);
+    if (ed.dom.zoomPct) ed.dom.zoomPct.textContent = Math.round((ed.zoom || 1) * 100) + '%';
   }
   // recalcula posições (arranjo/tipo/pattern) e re-renderiza
   function relayout(ed) { ed.layout = layoutCompute(PSD_MASKS[ed.maskIdx], ed.S); edRenderStage(ed); }
   const refreshBlock = relayout;
-  function refreshAllBlocks() { editors.forEach((ed) => { if (ed.dom) relayout(ed); }); }
+  function refreshAllBlocks() { editors.forEach((ed) => { if (ed.dom) relayout(ed); }); if (isReplicating()) syncAdaptations(); }
   function updateEditorsHint() { $('psdEditorsHint').classList.toggle('hidden', editors.length > 0); }
+
+  // ===== Replicação: material primário (editors[0]) → adaptações =====
+  // O 1º tamanho marcado é o primário. Ligada a caixinha, a composição dele é espelhada
+  // proporcionalmente (por fração da máscara, sem distorcer) em todas as demais adaptações.
+  function isReplicating() { const cb = $('psdReplicate'); return !!(cb && cb.checked); }
+  function primaryEditor() { return editors[0] || null; }
+  function syncAdaptations() {
+    if (!isReplicating()) return;
+    const prim = primaryEditor();
+    if (!prim || !prim.layout) return;
+    const pmk = PSD_MASKS[prim.maskIdx], PW = pmk.w, PH = pmk.h;
+    for (let i = 1; i < editors.length; i++) {
+      const ed = editors[i];
+      ed.S = Object.assign({}, prim.S);                 // mesmo tipo/estilo do primário
+      const mk = PSD_MASKS[ed.maskIdx], W = mk.w, H = mk.h;
+      const s = Math.min(W / PW, H / PH);               // escala uniforme (mantém o aspecto)
+      const T = new Map();
+      prim.layout.T.forEach((t, el) => {
+        const cxF = (t.x + t.w / 2) / PW, cyF = (t.y + t.h / 2) / PH;   // centro relativo à máscara
+        const w = t.w * s, h = t.h * s;
+        T.set(el, { x: cxF * W - w / 2, y: cyF * H - h / 2, w, h, rot: t.rot || 0 });
+      });
+      ed.layout = { T, onlyStar: prim.layout.onlyStar, star: prim.layout.star };
+      if (ed.dom) edRenderStage(ed);
+    }
+  }
+  let _syncRaf = 0;
+  function scheduleSync() { if (!isReplicating() || _syncRaf) return; _syncRaf = requestAnimationFrame(() => { _syncRaf = 0; syncAdaptations(); }); }
+  function syncIfPrimary(ed, live) { if (ed === primaryEditor()) { if (live) scheduleSync(); else syncAdaptations(); } }
+
+  // Etiqueta Primário/Adaptação + trava visual dos editores espelhados.
+  function applyRoleUI(ed, idx) {
+    if (!ed.dom || !ed.dom.roleBadge) return;
+    const rep = isReplicating(), primary = idx === 0, many = editors.length > 1;
+    const badge = ed.dom.roleBadge;
+    badge.style.display = many ? '' : 'none';
+    badge.textContent = primary ? 'Primário' : 'Adaptação';
+    badge.className = 'psdRole js-role ' + (primary ? 'primary' : 'adapt');
+    ed.dom.root.classList.toggle('isPrimary', primary && rep && many);
+    ed.dom.root.classList.toggle('mirrored', rep && !primary);
+  }
+  function refreshRoles() { editors.forEach((ed, i) => applyRoleUI(ed, i)); }
+  function updatePsdChrome() {
+    updateEditorsHint();
+    const dl = $('psdDownloadAll'); if (dl) dl.classList.toggle('hidden', editors.length === 0);
+    const wrap = $('psdReplicateWrap'); if (wrap) wrap.classList.toggle('on', isReplicating());
+    refreshRoles();
+  }
+
+  // ===== Snapping (micro-travamentos) ao mover — centro H/V e bordas da máscara =====
+  const SNAP_PX = 7;   // tolerância em pixels de TELA (independe do zoom)
+  function clearGuides(ed) { if (ed._guides) ed._guides.forEach((g) => g.remove()); ed._guides = []; }
+  function addGuide(ed, kind, posPx) {
+    const g = document.createElement('div'); g.className = 'psdGuide ' + kind;
+    if (kind === 'v') g.style.left = posPx + 'px'; else g.style.top = posPx + 'px';
+    ed.dom.stage.appendChild(g); (ed._guides || (ed._guides = [])).push(g);
+  }
+  // Ajusta o deslocamento (dx,dy) do arraste para travar no centro/bordas; desenha as guias.
+  function snapDrag(ed, anchorEl, starts, dx, dy) {
+    clearGuides(ed);
+    const mk = PSD_MASKS[ed.maskIdx], W = mk.w, H = mk.h;
+    const t = ed.layout.T.get(anchorEl); if (!t) return { dx, dy };
+    const tol = SNAP_PX / ed.disp;
+    const s0 = starts.find((s) => s.el === anchorEl) || starts[0];
+    const nx = s0.ox + dx, ny = s0.oy + dy, w = t.w, h = t.h;
+    const xT = [ { at: (W - w) / 2, g: W / 2 }, { at: 0, g: 0 }, { at: W - w, g: W } ];   // centro / esq / dir
+    const yT = [ { at: (H - h) / 2, g: H / 2 }, { at: 0, g: 0 }, { at: H - h, g: H } ];   // centro / topo / base
+    let bx = null, by = null;
+    for (const c of xT) if (Math.abs(nx - c.at) <= tol && (bx === null || Math.abs(nx - c.at) < Math.abs(nx - bx.at))) bx = c;
+    for (const c of yT) if (Math.abs(ny - c.at) <= tol && (by === null || Math.abs(ny - c.at) < Math.abs(ny - by.at))) by = c;
+    let adx = dx, ady = dy;
+    if (bx) { adx = bx.at - s0.ox; addGuide(ed, 'v', bx.g * ed.disp); }
+    if (by) { ady = by.at - s0.oy; addGuide(ed, 'h', by.g * ed.disp); }
+    return { dx: adx, dy: ady };
+  }
 
   function addEditor(maskIdx) {
     if (editors.some((e) => e.maskIdx === maskIdx)) return;
-    const ed = { maskIdx, S: defaultSettings(PSD_MASKS[maskIdx]), dom: null, layout: null, nodes: new Map(), sel: null, disp: 1 };
+    const ed = { maskIdx, S: defaultSettings(PSD_MASKS[maskIdx]), dom: null, layout: null, nodes: new Map(), selSet: new Set(), disp: 1, zoom: 1 };
     editors.push(ed);
     ed.dom = buildBlock(ed);
     $('psdEditors').appendChild(ed.dom.root);
     relayout(ed);
-    updateEditorsHint();
+    if (isReplicating()) syncAdaptations();   // se entrou como adaptação, já espelha o primário
+    updatePsdChrome();
   }
   function removeEditor(maskIdx) {
     const i = editors.findIndex((e) => e.maskIdx === maskIdx);
     if (i < 0) return;
     if (editors[i].dom) editors[i].dom.root.remove();
     editors.splice(i, 1);
-    updateEditorsHint();
+    if (isReplicating()) syncAdaptations();   // o primário pode ter mudado → re-espelha
+    updatePsdChrome();
   }
+  // Caixinha de replicação + baixar todas (sidebar direita).
+  (function wirePsdRightbar() {
+    const cb = $('psdReplicate');
+    if (cb) cb.addEventListener('change', () => {
+      if (isReplicating()) syncAdaptations();
+      updatePsdChrome();
+    });
+    const dl = $('psdDownloadAll');
+    if (dl) dl.addEventListener('click', () => {
+      editors.forEach((ed, i) => setTimeout(() => baixarCanvas(ed), i * 450));
+    });
+  })();
 
   const TIPO_HINT = {
     pattern: 'Padrão corrido: motivos repetidos preenchendo a máscara (dá a volta no produto).',
@@ -1583,9 +2530,31 @@
     const root = document.createElement('div');
     root.className = 'psdBlock';
     root.innerHTML =
-      `<div class="psdBlockHead"><strong>${esc(mk.label)}</strong><span class="dims">${mk.w}×${mk.h}px</span></div>` +
-      '<div class="psdStageWrap"><div class="psdStage js-stage"></div></div>' +
-      '<p class="note" style="margin:.5rem 0 0">Arraste um elemento para mover; use a alça no canto para redimensionar.</p>' +
+      `<div class="psdBlockHead"><strong>${esc(mk.label)}</strong><span class="psdRole adapt js-role" style="display:none"></span><span class="dims">${mk.w}×${mk.h}px</span></div>` +
+      '<div class="psdItemReg">' +
+        '<div class="psdItemRegRow">' +
+          '<div><label>Identifier</label><input class="amInput js-itemId" autocomplete="off"></div>' +
+          '<div><label>SKU</label><input class="amInput js-itemSku" autocomplete="off"></div>' +
+        '</div>' +
+        '<p class="psdItemRegStatus js-itemStatus"></p>' +
+      '</div>' +
+      '<div class="psdAlignBar">' +
+        '<button type="button" class="psdMiniBtn js-centerh" title="Centralizar horizontalmente no espaço" disabled>↔ Centralizar H</button>' +
+        '<button type="button" class="psdMiniBtn js-centerv" title="Centralizar verticalmente no espaço" disabled>↕ Centralizar V</button>' +
+        '<label class="psdRotateLabel">⟳ <input type="number" class="psdRotateInput js-rotinput" value="0" min="0" max="359" step="1" disabled>°</label>' +
+        '<button type="button" class="psdMiniBtn js-rotreset" title="Zerar rotação" disabled>Zerar giro</button>' +
+      '</div>' +
+      '<div class="psdZoomBar">' +
+        '<button type="button" class="psdMiniBtn psdZoomStep js-zoomout" title="Diminuir zoom">−</button>' +
+        '<span class="psdZoomPct js-zoompct">100%</span>' +
+        '<button type="button" class="psdMiniBtn psdZoomStep js-zoomin" title="Aumentar zoom">+</button>' +
+        '<button type="button" class="psdMiniBtn js-zoomreset" title="Restaurar zoom (100%)">Ajustar</button>' +
+      '</div>' +
+      '<div class="psdStageWrap"><div class="psdStage js-stage"></div><div class="psdMirrorLock" title="Espelhando o material primário — desligue a replicação para editar"></div></div>' +
+      '<p class="psdMirrorBadge">🔒 Espelhando o material primário. Desligue a caixinha “Replicar” (na direita) para editar este tamanho isoladamente.</p>' +
+      '<p class="note" style="margin:.5rem 0 0">Arraste um elemento para mover; use a alça no canto para redimensionar e o pontinho ⟳ acima dele para girar (segure Shift para travar de 15 em 15°). ' +
+        'Shift/Ctrl+clique soma à seleção; arraste numa área vazia para selecionar várias de uma vez. ' +
+        'Segure espaço e arraste para navegar pelo palco. Ao mover, ele trava suavemente no centro e nas bordas (guias rosa).</p>' +
       '<div class="psdControls">' +
         '<div class="tipoField" style="margin:0"><span class="tipoLabel">Tipo de estampa</span>' +
           '<div class="tipoSeg js-tipo"><button type="button" class="tipoBtn" data-tipo="pattern">Pattern</button><button type="button" class="tipoBtn" data-tipo="localizada">Localizada</button></div>' +
@@ -1606,7 +2575,7 @@
           S.estilo = o.v;
           cont.querySelectorAll('.js-est').forEach((x) => x.classList.toggle('active', x === b));
           q('.js-esthint').textContent = ESTILO_HINT[o.v] || '';
-          relayout(ed);
+          relayout(ed); syncIfPrimary(ed, false);
         });
         cont.appendChild(b);
       });
@@ -1621,10 +2590,40 @@
     root.querySelectorAll('.js-tipo .tipoBtn').forEach((b) => b.addEventListener('click', () => {
       if (S.tipo === b.dataset.tipo) return;
       S.tipo = b.dataset.tipo; S.estilo = DEFAULT_ESTILO[S.tipo];
-      applyTipoUI(); relayout(ed);
+      applyTipoUI(); relayout(ed); syncIfPrimary(ed, false);
     }));
     q('.js-dl').addEventListener('click', (e) => { e.preventDefault(); baixarCanvas(ed); });
-    return { root, stage: q('.js-stage') };
+    const itemIdEl = q('.js-itemId'), itemSkuEl = q('.js-itemSku'), itemStatusEl = q('.js-itemStatus');
+    const itemDefaults = defaultItemIdSku(mk);
+    itemIdEl.value = itemDefaults.identifier;
+    itemSkuEl.value = itemDefaults.sku;
+    itemIdEl.addEventListener('input', () => { ed.itemTouched = ed.itemTouched || {}; ed.itemTouched.id = true; });
+    itemSkuEl.addEventListener('input', () => { ed.itemTouched = ed.itemTouched || {}; ed.itemTouched.sku = true; });
+    const stageEl = q('.js-stage');
+    const wrapEl = q('.psdStageWrap');
+    const zoomPctEl = q('.js-zoompct');
+    const setZoom = (z) => {
+      ed.zoom = Math.max(0.4, Math.min(3, Math.round(z * 100) / 100));
+      edRenderStage(ed);
+    };
+    q('.js-zoomout').addEventListener('click', () => setZoom((ed.zoom || 1) - 0.15));
+    q('.js-zoomin').addEventListener('click', () => setZoom((ed.zoom || 1) + 0.15));
+    q('.js-zoomreset').addEventListener('click', () => { setZoom(1); wrapEl.scrollLeft = 0; wrapEl.scrollTop = 0; });
+    const centerHBtn = q('.js-centerh'), centerVBtn = q('.js-centerv');
+    centerHBtn.addEventListener('click', () => centerSelection(ed, 'h'));
+    centerVBtn.addEventListener('click', () => centerSelection(ed, 'v'));
+    const rotInput = q('.js-rotinput'), rotResetBtn = q('.js-rotreset');
+    rotInput.addEventListener('change', () => {
+      const deg = ((Number(rotInput.value) || 0) % 360 + 360) % 360;
+      rotInput.value = deg;
+      applyRotation(ed, deg);
+    });
+    rotResetBtn.addEventListener('click', () => { rotInput.value = 0; applyRotation(ed, 0); });
+    return {
+      root, stage: stageEl, wrap: wrapEl, zoomPct: zoomPctEl,
+      alignBtns: [centerHBtn, centerVBtn], rotInput, rotControls: [rotInput, rotResetBtn],
+      roleBadge: q('.js-role'), itemIdEl, itemSkuEl, itemStatusEl,
+    };
   }
 
   function baixarCanvas(ed) {
@@ -1634,5 +2633,44 @@
       a.download = `estampa-${mk.key}-${mk.w}x${mk.h}.png`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }, 'image/png');
+    registrarItemAdaptado(ed, mk);
+  }
+
+  // Registra o item (produto/tamanho) no momento do download — só então vira uma linha na(s)
+  // planilha(s). identifier/sku vêm dos campos editáveis do bloco (sugeridos, mas o usuário
+  // pode ter sobrescrito antes de baixar).
+  async function registrarItemAdaptado(ed, mk) {
+    const { itemIdEl, itemSkuEl, itemStatusEl } = ed.dom;
+    if (!NOME || !NOME.registroId) {
+      itemStatusEl.textContent = 'Aprove o nome da estampa antes de baixar.';
+      itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';
+      return;
+    }
+    const identifier = (itemIdEl.value || '').trim();
+    const sku = (itemSkuEl.value || '').trim();
+    if (!identifier || !sku) {
+      itemStatusEl.textContent = 'Preencha Identifier e SKU antes de baixar.';
+      itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';
+      return;
+    }
+    itemStatusEl.textContent = '⏳ registrando…';
+    itemStatusEl.className = 'psdItemRegStatus js-itemStatus';
+    try {
+      const r = await fetch('/api/estampas/registrar-item', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ registroId: NOME.registroId, produtoKey: mk.key, produtoLabel: mk.label, identifier, sku }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      let msg = j.sheetSynced ? '✅ registrado e sincronizado com a planilha' : '✅ registrado (planilha pendente — use "Reenviar pendências")';
+      if (j.oficialFutebol) {
+        msg += j.oficialFutebol.synced ? ' · planilha oficial de Futebol ✅' : ' · planilha oficial de Futebol pendente';
+      }
+      itemStatusEl.textContent = msg;
+      itemStatusEl.className = 'psdItemRegStatus js-itemStatus ok';
+    } catch (err) {
+      itemStatusEl.textContent = 'Erro ao registrar: ' + err.message;
+      itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';
+    }
   }
 </script>
