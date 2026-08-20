@@ -415,7 +415,8 @@
 
 
   /* ===== Tema claro/escuro + polimento visual ===== */
-  .topbar-actions { display: flex; align-items: center; gap: .5rem; }
+  .topbar-nav { display: flex; align-items: center; gap: .75rem; flex: 1 1 auto; min-width: 0; justify-content: space-between; }
+  .topbar-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
   .themeToggle { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
     border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
     cursor: pointer; flex: none; transition: background-color .15s, border-color .15s, color .15s, transform .12s; }
@@ -477,6 +478,7 @@
         <span>IA recompõe estampas para cada tamanho — sem esticar, sem bordas vazias</span>
       </div>
     </div>
+    <div class="topbar-nav">
     <nav class="tabs" role="tablist" aria-label="Seções">
       <button class="tab active" data-view="psd">Adaptar PSD</button>
       <button class="tab" data-view="estampas">Estampas Gocase</button>
@@ -493,6 +495,7 @@
         <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
       </button>
+    </div>
     </div>
   </div>
 </header>
