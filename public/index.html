@@ -121,13 +121,13 @@
   .psdResumoCard strong { font-size: .95rem; }
   .psdResumoMeta { font-size: .78rem; color: var(--muted); flex-basis: 100%; }
   .psdResumoEdit { margin-left: auto; }
-  .psdItemReg { display: flex; flex-direction: column; gap: .4rem; margin: .6rem 0; padding: .6rem .7rem;
+  .psdItemReg { display: flex; flex-direction: column; gap: .3rem; margin: .45rem 0; padding: .45rem .6rem;
     border: 1px dashed var(--border); border-radius: 8px; background: var(--surface-2); }
   .psdItemRegRow { display: flex; gap: .5rem; }
   .psdItemRegRow > div { flex: 1; min-width: 0; }
   .psdItemReg label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
     display: block; margin-bottom: .15rem; }
-  .psdItemReg input { width: 100%; }
+  .psdItemReg input { width: 100%; padding: .36rem .5rem; font-size: .84rem; }
   .psdItemRegStatus { font-size: .76rem; margin: 0; min-height: 1em; }
   .psdItemRegStatus.ok { color: var(--primary); }
   .psdItemRegStatus.err { color: var(--danger); }
@@ -263,13 +263,18 @@
   .apCheck input { width: 16px; height: 16px; accent-color: var(--primary); }
   /* Seletor "tipo de estampa" (Localizada / Pattern) — usado nos 2 fluxos */
   .tipoField { margin: 0 0 1rem; }
-  .tipoLabel { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--muted); margin-bottom: .4rem; }
+  .tipoLabel { display: block; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: var(--muted); margin-bottom: .22rem; }
   .tipoSeg { display: inline-flex; width: 100%; background: var(--chip-bg); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 3px; }
-  .tipoBtn { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .85rem;
-    padding: .5rem .6rem; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
+  .tipoBtn { flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .82rem;
+    padding: .34rem .6rem; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
   .tipoBtn:hover { color: var(--text); }
   .tipoBtn.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.14); }
-  .tipoHint { font-size: .75rem; color: var(--muted); margin: .4rem 0 0; }
+  .tipoHint { font-size: .72rem; color: var(--muted); margin: .22rem 0 0; }
+  .psdHelp { margin: .4rem 0 0; font-size: .74rem; color: var(--muted); }
+  .psdHelp summary { cursor: pointer; font-weight: 600; list-style: none; }
+  .psdHelp summary::-webkit-details-marker { display: none; }
+  .psdHelp summary::before { content: 'ⓘ '; }
+  .psdHelp p { margin: .3rem 0 0; line-height: 1.4; }
   /* Adaptar PSD */
   .uploadBtn:disabled { opacity: .5; cursor: not-allowed; background: var(--disabled-bg); border-style: solid; border-color: var(--border); }
   .psdOr { text-align: center; color: var(--muted); font-size: .78rem; margin: .6rem 0; text-transform: uppercase; letter-spacing: .05em; }
@@ -315,20 +320,20 @@
     cursor: pointer; flex: none; font-size: .9rem; filter: grayscale(1); opacity: .55; padding: 0; }
   .psdStar:hover { opacity: .85; }
   .psdStar.on { filter: none; opacity: 1; border-color: var(--warn); background: var(--warn-bg); }
-  .psdControls { display: flex; flex-direction: column; gap: .8rem; margin-top: 1rem; }
-  .psdCtl { display: flex; flex-direction: column; gap: .35rem; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .psdControls { display: flex; flex-direction: column; gap: .5rem; margin-top: .6rem; }
+  .psdCtl { display: flex; flex-direction: column; gap: .28rem; font-size: .78rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .psdBtnRow { display: flex; gap: .4rem; flex-wrap: wrap; }
   .psdBtnRow .psdMiniBtn { flex: 1 1 30%; }
-  .psdMiniBtn { flex: 1; padding: .55rem .5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  .psdMiniBtn { flex: 1; padding: .34rem .5rem; border: 1px solid var(--border); background: var(--surface); color: var(--text);
     border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; }
   .psdMiniBtn:hover { border-color: var(--primary); color: var(--primary); }
   .psdMiniBtn.active { border-color: var(--primary); color: var(--primary); background: var(--tint-1); }
   .psdStageWrap { display: flex; margin-top: .5rem;
     max-width: 660px; max-height: 480px; overflow: auto; padding: 2px; border-radius: 8px; }
   .psdStageWrap.panning { cursor: grabbing !important; user-select: none; }
-  .psdAlignBar { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-bottom: .5rem; flex-wrap: wrap; }
-  .psdZoomBar { display: flex; align-items: center; justify-content: center; gap: .4rem; margin-bottom: .5rem; }
-  .psdZoomStep { flex: none; width: 30px; padding: .35rem 0; font-size: 1.05rem; line-height: 1; }
+  .psdAlignBar { display: flex; align-items: center; justify-content: center; gap: .3rem; margin-bottom: .35rem; flex-wrap: wrap; }
+  .psdZoomBar { display: flex; align-items: center; justify-content: center; gap: .3rem; margin-bottom: .35rem; }
+  .psdZoomStep { flex: none; width: 26px; padding: .24rem 0; font-size: 1rem; line-height: 1; }
   .psdZoomPct { font-size: .78rem; font-weight: 700; color: var(--muted); min-width: 3.1rem; text-align: center; }
   .psdMiniBtn:disabled { opacity: .45; cursor: not-allowed; }
   .psdMarquee { position: absolute; border: 1px solid var(--primary); background: rgba(37,99,235,.14); pointer-events: none; z-index: 8; }
@@ -361,7 +366,7 @@
     background: var(--primary); transform: translateX(-50%); }
   .psdEl.sel .psdRotateHandle { display: block; }
   .psdRotateLabel { display: inline-flex; align-items: center; gap: .25rem; font-size: .82rem; font-weight: 600; color: var(--muted); }
-  .psdRotateInput { width: 3.4rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: 6px;
+  .psdRotateInput { width: 2.9rem; padding: .24rem .35rem; border: 1px solid var(--border); border-radius: 6px;
     background: var(--surface); color: var(--text); font: inherit; font-size: .85rem; text-align: center; }
   .psdRotateInput:disabled { opacity: .5; cursor: not-allowed; }
   /* Sidebar fixa com scroll interno e "Gerar" fixo no rodapé (só no layout de 2 colunas) */
@@ -378,7 +383,7 @@
   .psdBlockHead { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; margin-bottom: .75rem; }
   .psdBlockHead strong { font-size: 1rem; }
   .psdBlockHead .dims { font-size: .82rem; color: var(--muted); }
-  .psdBlock .psdControls { margin-top: 1rem; }
+  .psdBlock .psdControls { margin-top: .6rem; }
   /* Caixinha de replicação (sidebar direita) */
   .repToggle { display: flex; align-items: flex-start; gap: .55rem; cursor: pointer; padding: .6rem .7rem;
     border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2, rgba(127,127,127,.06));
@@ -2552,9 +2557,8 @@
       '</div>' +
       '<div class="psdStageWrap"><div class="psdStage js-stage"></div><div class="psdMirrorLock" title="Espelhando o material primário — desligue a replicação para editar"></div></div>' +
       '<p class="psdMirrorBadge">🔒 Espelhando o material primário. Desligue a caixinha “Replicar” (na direita) para editar este tamanho isoladamente.</p>' +
-      '<p class="note" style="margin:.5rem 0 0">Arraste um elemento para mover; use a alça no canto para redimensionar e o pontinho ⟳ acima dele para girar (segure Shift para travar de 15 em 15°). ' +
-        'Shift/Ctrl+clique soma à seleção; arraste numa área vazia para selecionar várias de uma vez. ' +
-        'Segure espaço e arraste para navegar pelo palco. Ao mover, ele trava suavemente no centro e nas bordas (guias rosa).</p>' +
+      '<details class="psdHelp"><summary>Como manusear</summary>' +
+        '<p>Arraste = mover · alça = redimensionar · ⟳ = girar (Shift trava de 15°) · Shift/Ctrl+clique = multi-seleção · arraste no vazio = selecionar em área · espaço+arraste = navegar · guias rosa = encaixe no centro/bordas.</p></details>' +
       '<div class="psdControls">' +
         '<div class="tipoField" style="margin:0"><span class="tipoLabel">Tipo de estampa</span>' +
           '<div class="tipoSeg js-tipo"><button type="button" class="tipoBtn" data-tipo="pattern">Pattern</button><button type="button" class="tipoBtn" data-tipo="localizada">Localizada</button></div>' +
