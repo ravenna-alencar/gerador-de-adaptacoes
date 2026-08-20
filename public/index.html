@@ -185,13 +185,7 @@
   .banner { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger); border-radius: 8px;
     padding: .75rem 1rem; margin-top: 1rem; text-align: center; }
   /* Abas */
-  /* Abas — segmented control */
-  .tabs { display: inline-flex; background: var(--chip-bg); border: 1px solid var(--border); border-radius: 11px; padding: 3px; gap: 2px; }
-  .tab { border: none; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .88rem;
-    padding: .5rem 1rem; border-radius: 8px; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
-  .tab:hover { color: var(--text); }
-  .tab.active { background: var(--surface); color: var(--primary); box-shadow: 0 1px 3px rgba(15,23,42,.14); }
-  @media (max-width: 560px) { .brand-text span { display: none; } .topbar-inner { padding: .7rem 1rem; } .tabs { width: 100%; } .tab { flex: 1; text-align: center; } }
+  @media (max-width: 560px) { .brand-text span { display: none; } .topbar-inner { padding: .7rem 1rem; } }
   /* Estampas */
   .subtabs { display: flex; gap: .4rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; flex-wrap: wrap; }
   .subtab { padding: .5rem .9rem; border: none; background: none; color: var(--muted); font-size: .9rem;
@@ -415,8 +409,36 @@
 
 
   /* ===== Tema claro/escuro + polimento visual ===== */
-  .topbar-nav { display: flex; align-items: center; gap: .75rem; flex: 1 1 auto; min-width: 0; justify-content: space-between; }
   .topbar-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
+
+  /* ---- Menu lateral (esquerda) ---- */
+  .shell { display: flex; align-items: flex-start; gap: 0; }
+  .sidenav { flex: none; width: 218px; padding: 1.5rem .75rem 2rem 1.25rem; display: flex; flex-direction: column; gap: 1.4rem;
+    position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; }
+  .navGroup { display: flex; flex-direction: column; gap: 2px; }
+  .navTitle { margin: 0 0 .45rem .55rem; font-size: .68rem; font-weight: 750; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); }
+  .navItem { display: flex; align-items: center; gap: .55rem; width: 100%; text-align: left; padding: .5rem .6rem;
+    border: none; border-radius: 9px; background: transparent; color: var(--muted); cursor: pointer;
+    font: inherit; font-size: .87rem; font-weight: 600; line-height: 1.2; }
+  .navItem:hover { background: var(--surface-2); color: var(--text); }
+  .navItem.active { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
+  .navIco { flex: none; width: 1.1rem; font-size: .95rem; line-height: 1; text-align: center; }
+  .navLabel { flex: 1; min-width: 0; }
+  .navSoon { flex: none; font-size: .78rem; opacity: .75; }
+  .shell > .page { flex: 1; min-width: 0; }
+
+  /* Placeholder das áreas ainda não construídas */
+  .soonCard { text-align: center; padding: 3rem 1.5rem; }
+  .soonIco { font-size: 2.6rem; line-height: 1; margin-bottom: .6rem; }
+  .soonCard h2 { margin-bottom: .35rem; }
+
+  @media (max-width: 900px) {
+    .shell { flex-direction: column; }
+    .sidenav { position: static; width: 100%; max-height: none; overflow: visible; flex-direction: row;
+      flex-wrap: wrap; gap: .75rem 1.5rem; padding: 1rem 1.25rem 0; }
+    .navGroup { flex: 1 1 220px; }
+  }
   .themeToggle { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px;
     border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
     cursor: pointer; flex: none; transition: background-color .15s, border-color .15s, color .15s, transform .12s; }
@@ -434,7 +456,7 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-  .tab, .subtab, .tipoBtn, .psdMiniBtn, .iconBtn, .checkItem, .estHead, .psdLayer, .estItem,
+  .navItem, .subtab, .tipoBtn, .psdMiniBtn, .iconBtn, .checkItem, .estHead, .psdLayer, .estItem,
   .resultCard, .idInfo, .adaptPanel, .uploadBtn {
     transition: background-color .15s ease, border-color .15s ease, color .15s ease;
   }
@@ -478,13 +500,6 @@
         <span>IA recompõe estampas para cada tamanho — sem esticar, sem bordas vazias</span>
       </div>
     </div>
-    <div class="topbar-nav">
-    <nav class="tabs" role="tablist" aria-label="Seções">
-      <button class="tab active" data-view="psd">Adaptar PSD</button>
-      <button class="tab" data-view="estampas">Estampas Gocase</button>
-      <button class="tab" data-view="id">Adaptar ID</button>
-      <button class="tab" data-view="adaptar">Adaptar imagem</button>
-    </nav>
     <div class="topbar-actions">
       <div class="stageBgPicker" role="group" aria-label="Fundo do palco de edição do PSD">
         <button type="button" class="stageBgSwatch" data-bg="checker" title="Fundo quadriculado (padrão)" aria-label="Fundo quadriculado"><span class="swatch swatch-checker"></span></button>
@@ -496,11 +511,52 @@
         <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
       </button>
     </div>
-    </div>
   </div>
 </header>
 
+<div class="shell">
+<aside class="sidenav" aria-label="Navegação principal">
+  <nav class="navGroup">
+    <p class="navTitle">Ilustração</p>
+    <button type="button" class="navItem active" data-view="psd">
+      <span class="navIco" aria-hidden="true">🆕</span><span class="navLabel">Novo ID</span>
+    </button>
+    <button type="button" class="navItem" data-view="id">
+      <span class="navIco" aria-hidden="true">🔍</span><span class="navLabel">Adaptar ID</span>
+    </button>
+    <button type="button" class="navItem" data-view="tag" data-soon="1">
+      <span class="navIco" aria-hidden="true">🏷️</span><span class="navLabel">Criar Tag</span><span class="navSoon" title="Em construção">🚧</span>
+    </button>
+    <button type="button" class="navItem" data-view="estampas">
+      <span class="navIco" aria-hidden="true">🔥</span><span class="navLabel">Best Sellers</span>
+    </button>
+  </nav>
+  <nav class="navGroup">
+    <p class="navTitle">Cadastro</p>
+    <button type="button" class="navItem" data-view="cad-geral" data-soon="1">
+      <span class="navIco" aria-hidden="true">📊</span><span class="navLabel">Visão Geral</span><span class="navSoon" title="Em construção">🚧</span>
+    </button>
+    <button type="button" class="navItem" data-view="cad-futebol" data-soon="1">
+      <span class="navIco" aria-hidden="true">⚽</span><span class="navLabel">Futebol</span><span class="navSoon" title="Em construção">🚧</span>
+    </button>
+    <button type="button" class="navItem" data-view="cad-licenciados" data-soon="1">
+      <span class="navIco" aria-hidden="true">🎬</span><span class="navLabel">Licenciados</span><span class="navSoon" title="Em construção">🚧</span>
+    </button>
+    <button type="button" class="navItem" data-view="cad-pendencias" data-soon="1">
+      <span class="navIco" aria-hidden="true">📌</span><span class="navLabel">Pendências</span><span class="navSoon" title="Em construção">🚧</span>
+    </button>
+  </nav>
+</aside>
+
 <div class="page">
+  <div id="view-soon" class="hidden">
+    <div class="card soonCard">
+      <div class="soonIco" aria-hidden="true">🚧</div>
+      <h2 id="soonTitle">Em construção</h2>
+      <p class="note" id="soonNote">Esta área ainda está sendo construída.</p>
+    </div>
+  </div>
+
   <div class="layout hidden" id="view-adaptar">
     <div class="col">
       <div class="card">
@@ -651,6 +707,7 @@
       </div>
     </div>
   </div>
+</div>
 </div>
 
 <script>
@@ -962,22 +1019,44 @@
       : 'Arte centralizada, concentrada na região central da máscara.';
   });
 
-  // ---- Abas ----
-  document.querySelectorAll('.tabs .tab').forEach((t) => {
+  // ---- Menu lateral ----
+  // Views reais (têm container próprio). O resto do menu ainda não foi construído
+  // e cai no placeholder #view-soon (🚧), com o título vindo do próprio item.
+  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar' };
+  const SOON_NOTE = {
+    tag: 'Aqui você vai criar/configurar uma nova coleção (tag). Em construção.',
+    'cad-geral': 'Panorama do cadastro de estampas. Em construção.',
+    'cad-futebol': 'Cadastro das estampas de futebol. Em construção.',
+    'cad-licenciados': 'Cadastro das estampas licenciadas. Em construção.',
+    'cad-pendencias': 'O que ainda falta cadastrar. Em construção.',
+  };
+
+  function setView(view, label) {
+    document.querySelectorAll('.sidenav .navItem').forEach((x) => {
+      x.classList.toggle('active', x.dataset.view === view);
+    });
+    const target = REAL_VIEWS[view] || null;
+    Object.values(REAL_VIEWS).forEach((id) => {
+      document.getElementById(id).classList.toggle('hidden', id !== target);
+    });
+    const soon = document.getElementById('view-soon');
+    soon.classList.toggle('hidden', !!target);
+    if (!target) {
+      document.getElementById('soonTitle').textContent = label || 'Em construção';
+      document.getElementById('soonNote').textContent = SOON_NOTE[view] || 'Esta área ainda está sendo construída.';
+    }
+    // Só a view do PSD precisa da página larga (duas sidebars + board).
+    document.querySelector('.page').classList.toggle('psdWide', view === 'psd');
+    if (view === 'estampas' && !estampasLoaded) loadEstampas();
+    if (view === 'psd') ensurePsdMaskOptions();
+  }
+
+  document.querySelectorAll('.sidenav .navItem').forEach((t) => {
     t.addEventListener('click', () => {
-      document.querySelectorAll('.tabs .tab').forEach((x) => x.classList.remove('active'));
-      t.classList.add('active');
-      const view = t.dataset.view;
-      document.getElementById('view-adaptar').classList.toggle('hidden', view !== 'adaptar');
-      document.getElementById('view-estampas').classList.toggle('hidden', view !== 'estampas');
-      document.getElementById('view-id').classList.toggle('hidden', view !== 'id');
-      document.getElementById('view-psd').classList.toggle('hidden', view !== 'psd');
-      document.querySelector('.page').classList.toggle('psdWide', view === 'psd');
-      if (view === 'estampas' && !estampasLoaded) loadEstampas();
-      if (view === 'psd') ensurePsdMaskOptions();
+      setView(t.dataset.view, t.querySelector('.navLabel').textContent.trim());
     });
   });
-  // PSD é a aba inicial → página larga desde o começo (as duas sidebars precisam de espaço).
+  // "Novo ID" (PSD) é a view inicial → página larga desde o começo.
   document.querySelector('.page').classList.add('psdWide');
 
   // ---- Estampas Gocase ----
