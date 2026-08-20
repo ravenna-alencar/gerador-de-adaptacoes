@@ -271,7 +271,12 @@
   .psdHelp p { margin: .3rem 0 0; line-height: 1.4; }
   /* Adaptar PSD */
   .uploadBtn:disabled { opacity: .5; cursor: not-allowed; background: var(--disabled-bg); border-style: solid; border-color: var(--border); }
-  .psdOr { text-align: center; color: var(--muted); font-size: .78rem; margin: .6rem 0; text-transform: uppercase; letter-spacing: .05em; }
+  /* PSD e imagem lado a lado — os dois caminhos de envio ocupam a mesma linha. */
+  .uploadPair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+  .uploadOpt { display: flex; flex-direction: column; min-width: 0; }
+  .uploadOpt .uploadBtn { min-height: 3.1rem; }
+  .uploadOpt .note { margin-top: .5rem; }
+  @media (max-width: 620px) { .uploadPair { grid-template-columns: 1fr; } }
   .psdImgBtn { border-style: solid; background: var(--surface-2); }
   .psdImgBtn:hover:not(:disabled) { background: var(--tint-1); }
   /* Etapa 1 — identificação da estampa (categoria/segmento/tag) */
@@ -670,7 +675,6 @@
       <div id="psdPageNomear">
         <div class="card" id="psdIdCard">
           <h2>1. Identifique a estampa</h2>
-          <p class="note">Escolha categoria e segmento antes de subir o PSD — isso é usado para sugerir o nome da estampa e fica registrado no histórico junto com quem cadastrou.</p>
           <div class="tipoField">
             <span class="tipoLabel">Categoria</span>
             <div class="tipoSeg" id="idCategoria">
@@ -697,15 +701,20 @@
         <div class="card">
           <h2>2. Envie o PSD da estampa</h2>
           <input id="psdFile" type="file" accept=".psd,image/vnd.adobe.photoshop" class="hidden" />
-          <button class="uploadBtn" id="psdPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">Selecionar arquivo .PSD</button>
-          <p class="note">A estampa é reposicionada com <strong>fidelidade total</strong> — os elementos (camadas) são reaproveitados como estão, sem IA reinterpretar a arte.</p>
-          <div id="psdStatus" class="status hidden" style="margin-top:.75rem"></div>
-          <p class="err" id="psdErr"></p>
-          <div class="psdOr">ou</div>
           <input id="psdImgFile" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" />
-          <button class="uploadBtn psdImgBtn" id="psdImgPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">🖼️ Adicionar imagem (nomear sem PSD)</button>
-          <p class="note">Ainda não tem o PSD pronto? Envie só uma imagem (JPG/PNG/WEBP) da estampa pra já sugerir e registrar o nome — sem gerar adaptações.</p>
-          <p class="err" id="psdImgErr"></p>
+          <div class="uploadPair">
+            <div class="uploadOpt">
+              <button class="uploadBtn" id="psdPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">Selecionar arquivo .PSD</button>
+              <p class="note">Reposiciona com <strong>fidelidade total</strong> — as camadas são reaproveitadas como estão, sem IA reinterpretar a arte.</p>
+              <p class="err" id="psdErr"></p>
+            </div>
+            <div class="uploadOpt">
+              <button class="uploadBtn psdImgBtn" id="psdImgPick" disabled title="Escolha categoria, segmento e a tag acima primeiro">🖼️ Adicionar imagem</button>
+              <p class="note">Sem o PSD pronto? Envie só a imagem (JPG/PNG/WEBP) pra sugerir e registrar o nome — sem gerar adaptações.</p>
+              <p class="err" id="psdImgErr"></p>
+            </div>
+          </div>
+          <div id="psdStatus" class="status hidden" style="margin-top:.75rem"></div>
         </div>
 
         <div class="card hidden" id="psdNomeCard">
