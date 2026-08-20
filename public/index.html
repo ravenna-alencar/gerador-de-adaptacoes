@@ -331,8 +331,11 @@
   .psdStageWrap { display: flex; margin-top: .5rem;
     max-width: 660px; max-height: 480px; overflow: auto; padding: 2px; border-radius: 8px; }
   .psdStageWrap.panning { cursor: grabbing !important; user-select: none; }
-  .psdAlignBar { display: flex; align-items: center; justify-content: center; gap: .3rem; margin-bottom: .35rem; flex-wrap: wrap; }
-  .psdZoomBar { display: flex; align-items: center; justify-content: center; gap: .3rem; margin-bottom: .35rem; }
+  .psdToolbar { display: flex; align-items: center; justify-content: center; gap: .45rem; margin: .5rem 0 .35rem; flex-wrap: wrap; }
+  .psdToolbarSep { width: 1px; align-self: stretch; background: var(--border); margin: .1rem 0; }
+  .psdAlignBar { display: flex; align-items: center; gap: .3rem; }
+  .psdZoomBar { display: flex; align-items: center; gap: .3rem; }
+  .psdToolbar .psdMiniBtn { flex: 0 0 auto; }
   .psdZoomStep { flex: none; width: 26px; padding: .24rem 0; font-size: 1rem; line-height: 1; }
   .psdZoomPct { font-size: .78rem; font-weight: 700; color: var(--muted); min-width: 3.1rem; text-align: center; }
   .psdMiniBtn:disabled { opacity: .45; cursor: not-allowed; }
@@ -2543,20 +2546,23 @@
         '</div>' +
         '<p class="psdItemRegStatus js-itemStatus"></p>' +
       '</div>' +
-      '<div class="psdAlignBar">' +
-        '<button type="button" class="psdMiniBtn js-centerh" title="Centralizar horizontalmente no espaço" disabled>↔ Centralizar H</button>' +
-        '<button type="button" class="psdMiniBtn js-centerv" title="Centralizar verticalmente no espaço" disabled>↕ Centralizar V</button>' +
-        '<label class="psdRotateLabel">⟳ <input type="number" class="psdRotateInput js-rotinput" value="0" min="0" max="359" step="1" disabled>°</label>' +
-        '<button type="button" class="psdMiniBtn js-rotreset" title="Zerar rotação" disabled>Zerar giro</button>' +
-      '</div>' +
-      '<div class="psdZoomBar">' +
-        '<button type="button" class="psdMiniBtn psdZoomStep js-zoomout" title="Diminuir zoom">−</button>' +
-        '<span class="psdZoomPct js-zoompct">100%</span>' +
-        '<button type="button" class="psdMiniBtn psdZoomStep js-zoomin" title="Aumentar zoom">+</button>' +
-        '<button type="button" class="psdMiniBtn js-zoomreset" title="Restaurar zoom (100%)">Ajustar</button>' +
-      '</div>' +
       '<div class="psdStageWrap"><div class="psdStage js-stage"></div><div class="psdMirrorLock" title="Espelhando o material primário — desligue a replicação para editar"></div></div>' +
       '<p class="psdMirrorBadge">🔒 Espelhando o material primário. Desligue a caixinha “Replicar” (na direita) para editar este tamanho isoladamente.</p>' +
+      '<div class="psdToolbar">' +
+        '<div class="psdAlignBar">' +
+          '<button type="button" class="psdMiniBtn js-centerh" title="Centralizar horizontalmente no espaço" disabled>↔ Centralizar H</button>' +
+          '<button type="button" class="psdMiniBtn js-centerv" title="Centralizar verticalmente no espaço" disabled>↕ Centralizar V</button>' +
+          '<label class="psdRotateLabel">⟳ <input type="number" class="psdRotateInput js-rotinput" value="0" min="0" max="359" step="1" disabled>°</label>' +
+          '<button type="button" class="psdMiniBtn js-rotreset" title="Zerar rotação" disabled>Zerar giro</button>' +
+        '</div>' +
+        '<span class="psdToolbarSep" aria-hidden="true"></span>' +
+        '<div class="psdZoomBar">' +
+          '<button type="button" class="psdMiniBtn psdZoomStep js-zoomout" title="Diminuir zoom">−</button>' +
+          '<span class="psdZoomPct js-zoompct">100%</span>' +
+          '<button type="button" class="psdMiniBtn psdZoomStep js-zoomin" title="Aumentar zoom">+</button>' +
+          '<button type="button" class="psdMiniBtn js-zoomreset" title="Restaurar zoom (100%)">Ajustar</button>' +
+        '</div>' +
+      '</div>' +
       '<details class="psdHelp"><summary>Como manusear</summary>' +
         '<p>Arraste = mover · alça = redimensionar · ⟳ = girar (Shift trava de 15°) · Shift/Ctrl+clique = multi-seleção · arraste no vazio = selecionar em área · espaço+arraste = navegar · guias rosa = encaixe no centro/bordas.</p></details>' +
       '<div class="psdControls">' +
