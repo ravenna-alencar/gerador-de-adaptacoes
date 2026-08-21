@@ -248,6 +248,9 @@
   .idAlocAtual strong { color: var(--text); }
   .idAlocOk { color: #16a34a; }
   .idAlocErr { color: #dc2626; }
+  /* No checklist de produtos: marca os que a estampa JÁ tem (não precisam ser adaptados). */
+  .checkItem.jaExiste { opacity: .72; }
+  .jaTemTag { font-size: .68rem; font-weight: 700; color: #16a34a; white-space: nowrap; }
   .idInfo { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem;
     display: flex; flex-direction: column; gap: .35rem; font-size: .92rem; }
   .idLabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-right: .3rem; }
@@ -1491,6 +1494,125 @@
   });
   $('idAlocTagSelect').addEventListener('change', (e) => { idAlocState.tag = e.target.value; idAlocSync(); });
 
+  /**
+   * Leva o item encontrado para o MESMO board do fluxo com PSD. Como não há PSD, as "camadas"
+   * saem da arte achatada (elementosDaArte) e o checklist de produtos já vem marcado nos que
+   * FALTAM — os que a estampa já tem aparecem como ✅ e ficam desmarcados.
+   */
+  async function idAdaptarNoBoard(d) {
+    const msg = document.getElementById('idAlocAtual');
+    const setMsg = (t, cls) => { if (msg) { msg.className = 'idAlocAtual' + (cls ? ' ' + cls : ''); msg.textContent = t; } };
+    if (!d.refUrl) { setMsg('Não encontrei a arte desta estampa para adaptar.', 'idAlocErr'); return; }
+    setMsg('Carregando a arte…');
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((res, rej) => {
+        img.onload = res;
+        img.onerror = () => rej(new Error('não consegui carregar a arte'));
+        img.src = '/api/img-proxy?url=' + encodeURIComponent(d.refUrl);
+      });
+
+      setMsg('Detectando elementos da arte…');
+      const { full, elements } = elementosDaArte(img);
+      PSD = { pw: full.width, ph: full.height, elements, bgColor: sampleBgColor(full), starEl: null };
+      psdHistory = [];
+
+      // Contexto equivalente ao do fluxo com PSD (usado no resumo e no registro do download).
+      NOME = {
+        registroId: null, categoria: catDoTipo(d.tipo), segmento: idAlocState.segmento,
+        tag: idAlocState.tag, nome: d.design || '',
+        identifier: d.identifier || slugifyJs(d.design || ''), userName: '',
+      };
+      psdNomeIsPsd = true;
+      psdNomeRegistrado = false;
+
+      renderPsdLayers();
+      $('psdLayersCard').classList.remove('hidden');
+      $('psdMaskCard').classList.remove('hidden');
+      $('psdNomeCard').classList.add('hidden');
+      psdAtualizarResumo();
+      psdSetStage('adaptar');
+      setView('psd');
+      // O board é a view do PSD, mas o usuário veio do "Adaptar ID" — mantém o menu coerente
+      // com o fluxo em que ele está.
+      document.querySelectorAll('.sidenav .navItem').forEach((n) => {
+        n.classList.toggle('active', n.dataset.view === 'id');
+      });
+      await ensurePsdMaskOptions();
+      idMarcarMascarasQueFaltam(d.checklist || []);
+      updateEditorsHint();
+      setMsg('');
+    } catch (err) {
+      setMsg(err.message, 'idAlocErr');
+    }
+  }
+
+  /** Categoria (Case/Térmicos/Têxteis) a partir do tipo devolvido pelo byid. */
+  function catDoTipo(tipo) {
+    const t = String(tipo || '').toLowerCase();
+    if (t.includes('term')) return 'Térmicos';
+    if (t.includes('text') || t.includes('têxt')) return 'Têxteis';
+    return 'Case';
+  }
+
+  /**
+   * Marca no checklist só os produtos em que a estampa AINDA NÃO existe (é o que falta adaptar)
+   * e sinaliza com ✅ os que já existem.
+   */
+  function idMarcarMascarasQueFaltam(checklist) {
+    const jaTem = new Set(checklist.filter((p) => p.presente).map((p) => p.key));
+    editors = []; $('psdEditors').innerHTML = '';
+    const inputs = $('psdMaskList').querySelectorAll('input[type=checkbox]');
+    let marcados = 0;
+    inputs.forEach((cb) => {
+      const mk = PSD_MASKS[Number(cb.value)];
+      const item = cb.closest('.checkItem');
+      const existe = mk && jaTem.has(mk.key);
+      cb.checked = false;
+      if (item) {
+        item.classList.toggle('jaExiste', !!existe);
+        const nome = item.querySelector('.checkName');
+        if (nome && existe && !nome.querySelector('.jaTemTag')) {
+          nome.insertAdjacentHTML('beforeend', ' <span class="jaTemTag" title="A estampa já existe neste produto">✅ já tem</span>');
+        }
+      }
+      // Marca o que falta (limita a 4 editores abertos de cara — o resto fica a um clique).
+      if (mk && !existe && marcados < 4) { cb.checked = true; addEditor(Number(cb.value)); marcados++; }
+    });
+    if (!marcados) {
+      const primeiro = inputs[0];
+      if (primeiro) { primeiro.checked = true; addEditor(Number(primeiro.value)); }
+    }
+  }
+
+  /** Grava a alocação do item buscado na tag escolhida. */
+  async function idAlocarTag() {
+    const msg = document.getElementById('idAlocAtual');
+    if (!idAlocItem || !idAlocState.tag) return false;
+    msg.className = 'idAlocAtual';
+    msg.textContent = 'Alocando…';
+    try {
+      const r = await fetch('/api/estampas/alocar-tag', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          itemRef: idAlocItem.ref, produto: idAlocItem.produto, design: idAlocItem.design,
+          segmento: idAlocState.segmento, tag: idAlocState.tag,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'falha ao alocar');
+      msg.className = 'idAlocAtual idAlocOk';
+      msg.innerHTML = `✓ Alocado em <strong>${esc(idAlocState.tag)}</strong>`;
+      return true;
+    } catch (err) {
+      msg.className = 'idAlocAtual idAlocErr';
+      msg.textContent = err.message;
+      return false;
+    }
+  }
+
   /** Monta a barra "Alocar nesta tag" abaixo do resultado da busca. */
   function idRenderAlocar(d) {
     idAlocItem = {
@@ -1501,34 +1623,25 @@
     const bar = document.createElement('div');
     bar.className = 'idAlocBar';
     bar.innerHTML =
-      '<button type="button" class="genBtn idAlocBtn" id="idAlocBtn">Alocar nesta tag</button>' +
+      '<button type="button" class="genBtn idAlocBtn" id="idAdaptarBtn">Adaptar esta estampa →</button>' +
+      '<button type="button" class="psdMiniBtn idAlocBtn" id="idAlocBtn">Só alocar na tag</button>' +
       '<span class="idAlocAtual" id="idAlocAtual"></span>';
     document.getElementById('idResult').appendChild(bar);
     idAlocSync();
 
+    // Fluxo principal: aloca na tag escolhida E segue para o board de adaptação.
+    document.getElementById('idAdaptarBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('idAdaptarBtn');
+      btn.disabled = true;
+      if (idAlocState.tag) await idAlocarTag();   // registra a tag antes de ir pro board
+      await idAdaptarNoBoard(d);
+      btn.disabled = false;
+    });
+
     document.getElementById('idAlocBtn').addEventListener('click', async () => {
       const btn = document.getElementById('idAlocBtn');
-      const msg = document.getElementById('idAlocAtual');
       btn.disabled = true;
-      msg.className = 'idAlocAtual';
-      msg.textContent = 'Alocando…';
-      try {
-        const r = await fetch('/api/estampas/alocar-tag', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            itemRef: idAlocItem.ref, produto: idAlocItem.produto, design: idAlocItem.design,
-            segmento: idAlocState.segmento, tag: idAlocState.tag,
-          }),
-        });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'falha ao alocar');
-        msg.className = 'idAlocAtual idAlocOk';
-        msg.innerHTML = `✓ Alocado em <strong>${esc(idAlocState.tag)}</strong>`;
-      } catch (err) {
-        msg.className = 'idAlocAtual idAlocErr';
-        msg.textContent = err.message;
-      }
+      await idAlocarTag();
       btn.disabled = false;
     });
 
@@ -1543,6 +1656,120 @@
           (j.alocacao.por ? ` · por ${esc(j.alocacao.por)}` : '');
       })
       .catch(() => {});
+  }
+
+  // ============ Detecção de "camadas" numa arte ACHATADA (fluxo Adaptar ID) ============
+  // Um ID que já existe não tem PSD: a arte é um PNG/JPG achatado. Para alimentar o mesmo board
+  // do fluxo com PSD, os motivos são separados aqui: derruba o fundo (flood fill a partir das
+  // bordas, tolerante à cor) e rotula as ilhas restantes (mesma lógica do "separar" das camadas).
+  // Sem ilhas separáveis (arte contígua/sangrada), vira UM elemento com a arte inteira.
+
+  /**
+   * Marca como fundo os pixels alcançáveis a partir das bordas cuja cor bate com a cor de fundo
+   * de referência (a predominante nas bordas — ou "transparente", se a arte já tem alfa).
+   * Flood fill a partir da borda, e não match global de cor: buracos internos da mesma cor do
+   * fundo (ex.: o miolo branco de um desenho) continuam fazendo parte do motivo.
+   */
+  function bgMaskFromBorders(data, W, H, tol) {
+    // 1) Cor de fundo de referência, a partir das bordas.
+    const sementes = [];
+    for (let x = 0; x < W; x++) { sementes.push(x); sementes.push((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { sementes.push(y * W); sementes.push(y * W + W - 1); }
+    let transp = 0;
+    const cont = new Map();
+    for (const s of sementes) {
+      const p = s * 4;
+      if (data[p + 3] < 40) { transp++; continue; }
+      // quantiza em blocos de 16 p/ agrupar variações de compressão
+      const k = ((data[p] >> 4) << 8) | ((data[p + 1] >> 4) << 4) | (data[p + 2] >> 4);
+      cont.set(k, (cont.get(k) || 0) + 1);
+    }
+    const fundoTransparente = transp >= sementes.length * 0.5;
+    let melhor = -1, melhorK = 0;
+    cont.forEach((v, k) => { if (v > melhor) { melhor = v; melhorK = k; } });
+    const bgR = ((melhorK >> 8) & 15) * 16 + 8, bgG = ((melhorK >> 4) & 15) * 16 + 8, bgB = (melhorK & 15) * 16 + 8;
+
+    const ehFundo = (i) => {
+      const p = i * 4;
+      if (data[p + 3] < 40) return true;                       // transparente é sempre fundo
+      if (fundoTransparente) return false;
+      return Math.abs(data[p] - bgR) <= tol && Math.abs(data[p + 1] - bgG) <= tol && Math.abs(data[p + 2] - bgB) <= tol;
+    };
+
+    // 2) Flood fill a partir de todas as bordas que são fundo — UMA fila, drenada até o fim.
+    const bg = new Uint8Array(W * H);
+    const fila = [];
+    const push = (i) => { if (!bg[i] && ehFundo(i)) { bg[i] = 1; fila.push(i); } };
+    for (const s of sementes) push(s);
+    while (fila.length) {
+      const i = fila.pop(), x = i % W, y = (i - x) / W;
+      if (x > 0) push(i - 1);
+      if (x < W - 1) push(i + 1);
+      if (y > 0) push(i - W);
+      if (y < H - 1) push(i + W);
+    }
+    return bg;
+  }
+
+  /** Recorta uma ilha do canvas em resolução total, zerando o que não é dela nem é fundo. */
+  function recortarIlha(full, c, labels, W2, sX, sY, nome) {
+    const x0 = Math.max(0, Math.floor(c.minx * sX)), y0 = Math.max(0, Math.floor(c.miny * sY));
+    const x1 = Math.min(full.width, Math.ceil((c.maxx + 1) * sX)), y1 = Math.min(full.height, Math.ceil((c.maxy + 1) * sY));
+    const cw = Math.max(1, x1 - x0), ch = Math.max(1, y1 - y0);
+    const cc = document.createElement('canvas'); cc.width = cw; cc.height = ch;
+    const ccx = cc.getContext('2d', { willReadFrequently: true });
+    ccx.drawImage(full, x0, y0, cw, ch, 0, 0, cw, ch);
+    const id = ccx.getImageData(0, 0, cw, ch), a = id.data;
+    for (let yy = 0; yy < ch; yy++) for (let xx = 0; xx < cw; xx++) {
+      const lx = Math.min(W2 - 1, Math.floor((x0 + xx) / sX)), ly = Math.floor((y0 + yy) / sY);
+      if (labels[ly * W2 + lx] !== c.label) a[(yy * cw + xx) * 4 + 3] = 0;
+    }
+    ccx.putImageData(id, 0, 0);
+    return {
+      name: nome, canvas: cc, ox: x0, oy: y0, ow: cw, oh: ch,
+      isBg: false, visible: true, dispSrc: toDisp(cc, 700), t: null,
+      group: '', isFolder: false, kids: null,
+    };
+  }
+
+  /** Arte achatada → lista de elementos no formato que o board já entende. */
+  function elementosDaArte(img) {
+    const full = document.createElement('canvas');
+    full.width = img.naturalWidth || img.width; full.height = img.naturalHeight || img.height;
+    full.getContext('2d').drawImage(img, 0, 0);
+
+    const escala = Math.min(1, 700 / Math.max(full.width, full.height));
+    const W2 = Math.max(1, Math.round(full.width * escala)), H2 = Math.max(1, Math.round(full.height * escala));
+    const s = document.createElement('canvas'); s.width = W2; s.height = H2;
+    const sx = s.getContext('2d', { willReadFrequently: true });
+    sx.drawImage(full, 0, 0, W2, H2);
+    const data = sx.getImageData(0, 0, W2, H2).data;
+
+    const bg = bgMaskFromBorders(data, W2, H2, 26);
+    const bin = new Uint8Array(W2 * H2);
+    for (let i = 0; i < bin.length; i++) bin[i] = bg[i] ? 0 : 1;
+
+    const r = Math.max(1, Math.round(Math.max(W2, H2) * 0.012));
+    const { comps, labels } = connectedComponents(dilate(bin, W2, H2, r), W2, H2);
+    const minArea = W2 * H2 * 0.0015;
+    const partes = comps.filter((c) => c.area >= minArea).sort((a, b) => a.minx - b.minx);
+
+    const sX = full.width / W2, sY = full.height / H2;
+    // ≥2 ilhas → um elemento por motivo. Senão a arte é contígua/sangrada: um elemento só.
+    if (partes.length >= 2) {
+      return {
+        full,
+        elements: partes.map((c, k) => recortarIlha(full, c, labels, W2, sX, sY, 'motivo ' + (k + 1))),
+      };
+    }
+    return {
+      full,
+      elements: [{
+        name: 'arte', canvas: full, ox: 0, oy: 0, ow: full.width, oh: full.height,
+        isBg: false, visible: true, dispSrc: toDisp(full, 700), t: null,
+        group: '', isFolder: false, kids: null,
+      }],
+    };
   }
 
   // ================= Etapa 0: identificação da estampa (categoria/segmento/tag) =================

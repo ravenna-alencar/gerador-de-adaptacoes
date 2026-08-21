@@ -899,6 +899,25 @@ export default {
         return json({ ok: true, tag: { id: Number(idRes.rows[0]?.id ?? 0), categoria, nome } });
       }
 
+      // Serve os bytes da arte de referência pela MESMA origem do app. Sem isso o canvas fica
+      // "tainted" (CORS) e não dá para ler os pixels — que é o que a detecção de camadas faz.
+      // Restrito aos hosts de arte conhecidos: não é um proxy aberto.
+      if (pathname === '/api/img-proxy') {
+        const alvo = url.searchParams.get('url') || '';
+        let host = '';
+        try { host = new URL(alvo).hostname; } catch { return json({ error: 'url inválida' }, 400); }
+        const permitidos = ['custom-case-images.s3.amazonaws.com', 'ik.imagekit.io'];
+        if (!permitidos.includes(host)) return json({ error: 'host não permitido' }, 403);
+        const res = await fetch(alvo);
+        if (!res.ok) return json({ error: `imagem indisponível (HTTP ${res.status})` }, 502);
+        return new Response(res.body, {
+          headers: {
+            'content-type': res.headers.get('content-type') || 'image/png',
+            'cache-control': 'public, max-age=3600',
+          },
+        });
+      }
+
       // ---- Alocação de um item existente numa tag (aba "Adaptar ID") ----
       if (pathname === '/api/estampas/alocar-tag' && request.method === 'POST') {
         await ensureAlocacoesTable(env);
