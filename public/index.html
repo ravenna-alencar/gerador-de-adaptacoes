@@ -238,6 +238,16 @@
   .idbar { display: flex; gap: .5rem; margin: .75rem 0 1rem; flex-wrap: wrap; }
   .idbar .amInput { flex: 1; min-width: 200px; }
   .idGoBtn { width: auto; padding: .7rem 1.4rem; }
+  /* Seletor de tag da aba Adaptar ID: em qual tag o item encontrado será alocado. */
+  .idTagBar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 1rem; margin-top: .9rem; }
+  @media (max-width: 620px) { .idTagBar { grid-template-columns: 1fr; } }
+  .idTagBar .tipoField { margin: 0; }
+  .idAlocBar { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-top: .9rem; }
+  .idAlocBtn { width: auto; padding: .55rem 1.1rem; font-size: .85rem; }
+  .idAlocAtual { font-size: .8rem; color: var(--muted); }
+  .idAlocAtual strong { color: var(--text); }
+  .idAlocOk { color: #16a34a; }
+  .idAlocErr { color: #dc2626; }
   .idInfo { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem;
     display: flex; flex-direction: column; gap: .35rem; font-size: .92rem; }
   .idLabel { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; margin-right: .3rem; }
@@ -664,6 +674,20 @@
       <div class="idbar">
         <input id="idInput" class="amInput" placeholder="Ex.: 74826, ramos-laterais ou lacos-flores-case" />
         <button id="idGo" class="genBtn idGoBtn" type="button">Buscar</button>
+      </div>
+      <div class="idTagBar">
+        <div class="tipoField">
+          <span class="tipoLabel">Segmento</span>
+          <div class="tipoSeg" id="idAlocSegmento">
+            <button type="button" class="tipoBtn active" data-segmento="futebol">Futebol</button>
+            <button type="button" class="tipoBtn" data-segmento="autoral">Autoral</button>
+            <button type="button" class="tipoBtn" data-segmento="licenciado">Licenciado</button>
+          </div>
+        </div>
+        <div class="tipoField">
+          <span class="tipoLabel" id="idAlocTagLabel">Time</span>
+          <select id="idAlocTagSelect" class="amInput"></select>
+        </div>
       </div>
       <div id="idResult"></div>
     </div>
@@ -1418,11 +1442,108 @@
           '<h3 class="idCovTitle">Adaptações</h3>' +
           '<div id="idCoverage" class="estBody" style="display:block; border:0; background:transparent; padding:0"></div>';
         renderCoverage(document.getElementById('idCoverage'), d.design, d.checklist, d.refUrl);
+        idRenderAlocar(d);
       })
       .catch((e) => { out.innerHTML = `<div class="banner">Erro de rede: ${esc(e.message)}</div>`; });
   }
   document.getElementById('idGo').addEventListener('click', idBuscar);
   document.getElementById('idInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') idBuscar(); });
+
+  // ---- Alocar o item encontrado numa tag ----
+  // Mesma origem de opções do "Novo ID" (idTagMeta): Futebol = os 18 times oficiais;
+  // Coleção/Licenciado = só as tags criadas em "Criar Tag".
+  const idAlocState = { segmento: 'futebol', tag: '' };
+
+  function idAlocApply() {
+    const meta = idTagMeta[idAlocState.segmento] || idTagMeta.futebol;
+    const opts = meta.options();
+    const sel = $('idAlocTagSelect');
+    $('idAlocTagLabel').textContent = meta.label;
+    if (!opts.length) {
+      sel.innerHTML = `<option value="">${esc(meta.vazio || 'Nenhuma opção disponível')}</option>`;
+      sel.disabled = true;
+      idAlocState.tag = '';
+    } else {
+      sel.innerHTML = opts.map((o) => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
+      sel.disabled = false;
+      idAlocState.tag = sel.value || '';
+    }
+    idAlocSync();
+  }
+
+  // Habilita/atualiza o botão conforme há item buscado + tag escolhida.
+  function idAlocSync() {
+    const btn = document.getElementById('idAlocBtn');
+    if (!btn) return;
+    btn.disabled = !(idAlocItem && idAlocState.tag);
+    btn.title = idAlocState.tag ? '' : 'Escolha uma tag acima';
+  }
+
+  let idAlocItem = null; // { ref, produto, design }
+
+  $('idAlocSegmento').querySelectorAll('.tipoBtn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      $('idAlocSegmento').querySelectorAll('.tipoBtn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      idAlocState.segmento = btn.dataset.segmento;
+      idAlocApply();
+    });
+  });
+  $('idAlocTagSelect').addEventListener('change', (e) => { idAlocState.tag = e.target.value; idAlocSync(); });
+
+  /** Monta a barra "Alocar nesta tag" abaixo do resultado da busca. */
+  function idRenderAlocar(d) {
+    idAlocItem = {
+      ref: `${d.source || 'site'}:${d.id}`,
+      produto: d.produto || '',
+      design: d.design || '',
+    };
+    const bar = document.createElement('div');
+    bar.className = 'idAlocBar';
+    bar.innerHTML =
+      '<button type="button" class="genBtn idAlocBtn" id="idAlocBtn">Alocar nesta tag</button>' +
+      '<span class="idAlocAtual" id="idAlocAtual"></span>';
+    document.getElementById('idResult').appendChild(bar);
+    idAlocSync();
+
+    document.getElementById('idAlocBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('idAlocBtn');
+      const msg = document.getElementById('idAlocAtual');
+      btn.disabled = true;
+      msg.className = 'idAlocAtual';
+      msg.textContent = 'Alocando…';
+      try {
+        const r = await fetch('/api/estampas/alocar-tag', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            itemRef: idAlocItem.ref, produto: idAlocItem.produto, design: idAlocItem.design,
+            segmento: idAlocState.segmento, tag: idAlocState.tag,
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'falha ao alocar');
+        msg.className = 'idAlocAtual idAlocOk';
+        msg.innerHTML = `✓ Alocado em <strong>${esc(idAlocState.tag)}</strong>`;
+      } catch (err) {
+        msg.className = 'idAlocAtual idAlocErr';
+        msg.textContent = err.message;
+      }
+      btn.disabled = false;
+    });
+
+    // Mostra a alocação atual, se o item já tiver uma.
+    fetch('/api/estampas/alocacao?ref=' + encodeURIComponent(idAlocItem.ref))
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.alocacao) return;
+        const msg = document.getElementById('idAlocAtual');
+        if (!msg || msg.textContent) return; // já houve ação do usuário
+        msg.innerHTML = `Hoje em <strong>${esc(j.alocacao.tag)}</strong>` +
+          (j.alocacao.por ? ` · por ${esc(j.alocacao.por)}` : '');
+      })
+      .catch(() => {});
+  }
 
   // ================= Etapa 0: identificação da estampa (categoria/segmento/tag) =================
   // Escolhido ANTES do upload do PSD. Some ao contexto enviado pra IA de nomeação e ao registro
@@ -1493,6 +1614,7 @@
         idApplyTagMeta();
         idValidate();
       }
+      if (idAlocState.segmento === 'autoral' || idAlocState.segmento === 'licenciado') idAlocApply();
     } catch (err) {
       $('tagListColecao').innerHTML = '<li class="tagEmpty">Erro ao carregar</li>';
       $('tagListLicenciado').innerHTML = '<li class="tagEmpty">Erro ao carregar</li>';
@@ -1589,6 +1711,9 @@
   $('idTagSelect').addEventListener('change', (e) => { idState.tag = e.target.value; idValidate(); });
   idApplyTagMeta();
   idValidate();
+  // Só aqui (e não junto do bloco "Adaptar ID") porque idTagMeta é declarado nesta seção:
+  // chamar antes cairia na TDZ.
+  idAlocApply();
   // Carrega as tags já na abertura: o seletor de Coleção/Licenciado depende delas.
   loadTags();
 

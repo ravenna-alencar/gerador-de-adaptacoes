@@ -241,6 +241,29 @@ async function ensureTagsTable(env: Env): Promise<void> {
   );
 }
 
+/**
+ * Alocação de um item JÁ EXISTENTE (achado na aba "Adaptar ID") numa tag. Diferente de
+ * registros_estampas, que é a nomeação de uma estampa NOVA: aqui o produto já existe no
+ * catálogo e só está sendo classificado. Uma alocação por item (o UNIQUE em item_ref faz o
+ * upsert trocar a tag em vez de acumular histórico duplicado).
+ */
+async function ensureAlocacoesTable(env: Env): Promise<void> {
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS itens_tags (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_email TEXT,
+      item_ref TEXT NOT NULL,
+      produto TEXT,
+      design TEXT,
+      segmento TEXT NOT NULL,
+      tag TEXT NOT NULL
+    )`,
+    [],
+  );
+  await env.DB.exec(`CREATE UNIQUE INDEX IF NOT EXISTS itens_tags_ref ON itens_tags (item_ref)`, []);
+}
+
 async function ensureRegistrosTable(env: Env): Promise<void> {
   await env.DB.exec(
     `CREATE TABLE IF NOT EXISTS registros_estampas (
@@ -874,6 +897,47 @@ export default {
         );
         const idRes = await env.DB.query('SELECT last_insert_rowid() AS id', []);
         return json({ ok: true, tag: { id: Number(idRes.rows[0]?.id ?? 0), categoria, nome } });
+      }
+
+      // ---- Alocação de um item existente numa tag (aba "Adaptar ID") ----
+      if (pathname === '/api/estampas/alocar-tag' && request.method === 'POST') {
+        await ensureAlocacoesTable(env);
+        const body = (await request.json()) as {
+          itemRef?: string; produto?: string; design?: string; segmento?: string; tag?: string;
+        };
+        const itemRef = String(body.itemRef || '').trim();
+        const segmento = String(body.segmento || '').trim();
+        const tag = String(body.tag || '').trim();
+        if (!itemRef) return json({ error: 'itemRef obrigatório' }, 400);
+        if (!segmento || !tag) return json({ error: 'segmento e tag são obrigatórios' }, 400);
+        const userEmail = request.headers.get('x-godeploy-user-email') || null;
+        // Uma alocação por item: refazer a alocação troca a tag (não acumula).
+        await env.DB.exec('DELETE FROM itens_tags WHERE item_ref = ?', [itemRef]);
+        await env.DB.exec(
+          `INSERT INTO itens_tags (created_at, user_email, item_ref, produto, design, segmento, tag)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [new Date().toISOString(), userEmail, itemRef, body.produto || null, body.design || null, segmento, tag],
+        );
+        return json({ ok: true, alocacao: { itemRef, segmento, tag, por: displayNameFromEmail(userEmail) } });
+      }
+
+      // Alocação atual de um item (mostrada ao buscar na aba "Adaptar ID").
+      if (pathname === '/api/estampas/alocacao' && request.method === 'GET') {
+        await ensureAlocacoesTable(env);
+        const ref = (url.searchParams.get('ref') || '').trim();
+        if (!ref) return json({ error: 'ref obrigatório' }, 400);
+        const r = await env.DB.query(
+          'SELECT segmento, tag, created_at, user_email FROM itens_tags WHERE item_ref = ?',
+          [ref],
+        );
+        if (!r.rows.length) return json({ alocacao: null });
+        const row = r.rows[0];
+        return json({
+          alocacao: {
+            segmento: String(row.segmento), tag: String(row.tag),
+            em: String(row.created_at || ''), por: displayNameFromEmail(row.user_email as string | null),
+          },
+        });
       }
 
       if (pathname === '/api/tags/excluir' && request.method === 'POST') {
