@@ -2294,6 +2294,11 @@
   let spaceDown = false;   // barra de espaço pressionada → arrastar no palco navega (pan) em vez de selecionar
   const isSpanning = (e) => !!PSD && e.ow >= PSD.pw * 0.85 && e.oh >= PSD.ph * 0.85;  // camada ~full-canvas
 
+  // Tira qualquer espaço de um identifier/SKU: espaços (soltos ou ao redor de "-") viram "-",
+  // e hifens repetidos colapsam. "icones-pop-glam - garrafa" -> "icones-pop-glam-garrafa".
+  function semEspacos(s) {
+    return String(s || '').trim().replace(/\s+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
+  }
   // Identifier/SKU sugeridos por item (produto/tamanho) — espelha o slugify do servidor.
   function slugifyJs(s) {
     return String(s || '')
@@ -2317,14 +2322,14 @@
   // Sugestão de Identifier/SKU pra um produto/tamanho — editável antes de baixar/registrar.
   // Térmicos+Futebol com produto mapeado segue o padrão real da planilha oficial (identifier
   // com sufixo "-termicos", SKU com o código curto do modelo); os demais casos usam
-  // "<identifier> - <produto>", no mesmo espírito do SKU de item único (Case) já combinado.
+  // "<identifier>-<produto>". SKU é sempre um slug contínuo: sem espaços, tudo junto por "-".
   function defaultItemIdSku(mk) {
     if (!NOME) return { identifier: '', sku: '' };
     const base = NOME.identifier;
     const oficial = (NOME.categoria === 'Térmicos' && NOME.segmento === 'futebol')
       ? PRODUTO_KEY_TO_OFICIAL_FUTEBOL[mk.key] : null;
     if (oficial) return { identifier: `${base}-termicos`, sku: `${base}-${oficial.code}` };
-    return { identifier: base, sku: `${base} - ${slugifyJs(mk.label)}` };
+    return { identifier: base, sku: `${base}-${slugifyJs(mk.label)}` };
   }
   // Reaplica a sugestão em blocos já abertos (ex.: o 1º editor, criado antes de aprovar o
   // nome) — só nos campos que o usuário ainda não editou manualmente.
@@ -3691,8 +3696,12 @@
       itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';
       return;
     }
-    const identifier = (itemIdEl.value || '').trim();
-    const sku = (itemSkuEl.value || '').trim();
+    // Normaliza antes de registrar: SKU/Identifier são slugs contínuos, sem espaço nenhum —
+    // inclusive se o usuário editou o campo à mão e deixou " - " ou espaços soltos.
+    const identifier = semEspacos(itemIdEl.value);
+    const sku = semEspacos(itemSkuEl.value);
+    if (identifier !== (itemIdEl.value || '').trim()) itemIdEl.value = identifier;
+    if (sku !== (itemSkuEl.value || '').trim()) itemSkuEl.value = sku;
     if (!identifier || !sku) {
       itemStatusEl.textContent = 'Preencha Identifier e SKU antes de baixar.';
       itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';

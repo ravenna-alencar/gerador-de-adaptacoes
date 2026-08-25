@@ -1171,7 +1171,7 @@ export default {
         let item: RegistrarItemResult | undefined;
         if (!body.temAdaptacao && registroId != null) {
           const catSlug = CATEGORIA_SLUG[body.categoria] || slugify(body.categoria);
-          const sku = `${identifier} - ${catSlug}`;
+          const sku = `${identifier}-${catSlug}`;   // slug contínuo, sem espaços
           item = await registrarItemInterno(env, {
             registroId, categoria: body.categoria, segmento: body.segmento, tag: body.tag || '',
             nome: body.nome, userEmail, userName, produtoKey: null, produtoLabel: body.categoria,
