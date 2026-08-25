@@ -328,6 +328,31 @@
   .psdDel:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
 
   .psdEye.off { opacity: .4; }
+  /* Camada do tipo "copy" (texto): vira duas linhas — a principal (igual às demais) e uma
+     sub-linha com os controles de cor/traçado, só pra esse tipo de elemento. */
+  .psdLayer.copyLayer { flex-direction: column; align-items: stretch; }
+  .psdLayerMain { display: flex; align-items: center; gap: .6rem; }
+  .psdCopyControls { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding-left: 40px; }
+  .psdCopyControls input[type="color"] { width: 26px; height: 26px; padding: 0; border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer; background: none; flex: none; }
+  .psdCopyControls input[type="range"] { width: 90px; accent-color: var(--primary); }
+  .psdCopyStrokeToggle.on { color: var(--primary); border-color: var(--primary); background: var(--tint-1); }
+  .psdCopyLabel { font-size: .68rem; color: var(--muted); }
+  .psdAddCopyBar { display: flex; gap: .4rem; margin-top: .5rem; }
+  .psdAddCopyBar select { flex: 1; min-width: 0; }
+  /* Camada "fonte": guia da customização de nome — visível no board, fora do PNG. */
+  .psdLayer.fonteLayer { flex-direction: column; align-items: stretch;
+    border-style: dashed; background: repeating-linear-gradient(135deg,
+      transparent 0 7px, color-mix(in srgb, var(--primary) 5%, transparent) 7px 14px); }
+  .psdLayerBadge.psdGuia { color: var(--primary); border-color: var(--primary); background: var(--tint-1);
+    cursor: default; white-space: nowrap; }
+  .psdCopyControls input.psdFonteText { flex: 1; min-width: 90px; padding: .25rem .45rem; font-size: .78rem; }
+  /* A barra de fontes é vertical (busca + lista + texto + botão), diferente da do copy. */
+  #psdAddFonteBar { flex-direction: column; }
+  #psdAddFonteBar select { width: 100%; }
+  .psdFonteNota { margin: .1rem 0 0; }
+  /* No stage, o guia fica tracejado e translúcido — deixa claro que não é arte final. */
+  .psdEl.guia { opacity: .62; outline: 2px dashed color-mix(in srgb, var(--primary) 65%, transparent); outline-offset: 2px; }
   .psdStar { width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
     cursor: pointer; flex: none; font-size: .9rem; filter: grayscale(1); opacity: .55; padding: 0; }
   .psdStar:hover { opacity: .85; }
@@ -563,6 +588,9 @@
     <button type="button" class="navItem" data-view="tag">
       <span class="navIco" aria-hidden="true">🏷️</span><span class="navLabel">Criar Tag</span>
     </button>
+    <button type="button" class="navItem" data-view="copy">
+      <span class="navIco" aria-hidden="true">📝</span><span class="navLabel">Copys</span>
+    </button>
     <button type="button" class="navItem" data-view="estampas">
       <span class="navIco" aria-hidden="true">🔥</span><span class="navLabel">Best Sellers</span>
     </button>
@@ -624,6 +652,30 @@
           <ul class="tagList" id="tagListLicenciado"><li class="tagEmpty">Carregando…</li></ul>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div id="view-copy" class="hidden tagView">
+    <div class="card">
+      <h2>Cadastrar Copy</h2>
+      <p class="note">Textos cadastrados aqui ficam disponíveis para adicionar como elemento de texto no board de adaptação (Novo ID / Adaptar ID) — cor, tamanho e traçado são ajustados na hora, em cada estampa.</p>
+      <div class="tipoField">
+        <span class="tipoLabel">Texto do Copy</span>
+        <input id="copyTexto" class="amInput" maxlength="120" placeholder="Ex.: Edição Limitada" autocomplete="off" />
+      </div>
+      <button class="genBtn" id="copyCriar" type="button" disabled>Criar Copy</button>
+      <p class="note" id="copyMsg"></p>
+      <button type="button" class="psdMiniBtn" id="copyLoteToggle" style="margin-top:.75rem">Colar vários de uma vez</button>
+      <div class="hidden" id="copyLoteBar" style="margin-top:.6rem">
+        <textarea id="copyLoteTexto" class="amInput" rows="6" style="resize:vertical;font:inherit" placeholder="Um copy por linha"></textarea>
+        <button class="genBtn" id="copyLoteCriar" type="button" style="margin-top:.5rem">Cadastrar todos</button>
+        <p class="note" id="copyLoteMsg"></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Copys cadastrados</h2>
+      <ul class="tagList" id="copyList"><li class="tagEmpty">Carregando…</li></ul>
     </div>
   </div>
 
@@ -767,7 +819,20 @@
         <h2>1. Elementos detectados</h2>
         <p class="note">Marque quais camadas são <strong>fundo</strong> e quais são <strong>elementos</strong>. Clique na <strong>⭐</strong> para eleger o <strong>elemento principal</strong> — ele fica centralizado em destaque na estampa.</p>
         <ul class="psdLayers" id="psdLayers"></ul>
-        <button type="button" class="psdMiniBtn" id="psdUndo" disabled style="margin-top:.75rem;width:100%">↩︎ Desfazer</button>
+        <button type="button" class="psdMiniBtn" id="psdAddCopyBtn" style="margin-top:.6rem;width:100%">+ Adicionar Copy</button>
+        <div class="psdAddCopyBar hidden" id="psdAddCopyBar">
+          <select id="psdCopySelect" class="amInput"></select>
+          <button type="button" class="psdMiniBtn" id="psdCopyInserir">Inserir</button>
+        </div>
+        <button type="button" class="psdMiniBtn" id="psdAddFonteBtn" style="margin-top:.5rem;width:100%">+ Adicionar Fonte</button>
+        <div class="psdAddCopyBar hidden" id="psdAddFonteBar">
+          <input id="psdFonteBusca" class="amInput" placeholder="Buscar fonte…" autocomplete="off" />
+          <select id="psdFonteSelect" class="amInput" size="6"></select>
+          <input id="psdFonteTexto" class="amInput" maxlength="40" value="Seu Nome" placeholder="Texto de exemplo" autocomplete="off" />
+          <button type="button" class="psdMiniBtn" id="psdFonteInserir">Inserir</button>
+          <p class="note psdFonteNota">Guia de composição para a customização de nome — <strong>não sai no PNG</strong>.</p>
+        </div>
+        <button type="button" class="psdMiniBtn" id="psdUndo" disabled style="margin-top:.5rem;width:100%">↩︎ Desfazer</button>
       </div>
       </div>
     </div>
@@ -1108,7 +1173,7 @@
   // ---- Menu lateral ----
   // Views reais (têm container próprio). O resto do menu ainda não foi construído
   // e cai no placeholder #view-soon (🚧), com o título vindo do próprio item.
-  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar', tag: 'view-tag' };
+  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar', tag: 'view-tag', copy: 'view-copy' };
   const SOON_NOTE = {
     'cad-geral': 'Panorama do cadastro de estampas. Em construção.',
     'cad-futebol': 'Cadastro das estampas de futebol. Em construção.',
@@ -1135,6 +1200,7 @@
     if (view === 'estampas' && !estampasLoaded) loadEstampas();
     if (view === 'psd') ensurePsdMaskOptions();
     if (view === 'tag') loadTags();
+    if (view === 'copy') loadCopys();
   }
 
   document.querySelectorAll('.sidenav .navItem').forEach((t) => {
@@ -1913,6 +1979,115 @@
     }
   });
 
+  // ---- Copys (biblioteca de textos p/ inserir no board) ----
+  let copysLoaded = false;
+  const COPYS = [];
+  function copyRender() {
+    $('copyList').innerHTML = COPYS.length
+      ? COPYS.map((c) => `<li><span class="tagName">${esc(c.texto)}</span>` +
+          `${c.criadoPor ? `<span class="tagWho">${esc(c.criadoPor)}</span>` : ''}` +
+          `<button type="button" class="tagDel" data-id="${c.id}" title="Excluir copy">✕</button></li>`).join('')
+      : '<li class="tagEmpty">Nenhum copy cadastrado ainda</li>';
+  }
+  async function loadCopys(force) {
+    if (copysLoaded && !force) return;
+    try {
+      const r = await fetch('/api/copys');
+      const j = await r.json();
+      COPYS.length = 0;
+      (j.copys || []).forEach((c) => COPYS.push(c));
+      copysLoaded = true;
+      copyRender();
+    } catch {
+      $('copyList').innerHTML = '<li class="tagEmpty">Erro ao carregar</li>';
+    }
+  }
+  function copyMsg(txt, cls) {
+    const el = $('copyMsg');
+    el.textContent = txt || '';
+    el.className = 'note' + (cls ? ' ' + cls : '');
+  }
+  $('copyTexto').addEventListener('input', () => {
+    $('copyCriar').disabled = !$('copyTexto').value.trim();
+    copyMsg('');
+  });
+  $('copyTexto').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && $('copyTexto').value.trim()) $('copyCriar').click();
+  });
+  $('copyCriar').addEventListener('click', async () => {
+    const texto = $('copyTexto').value.trim();
+    if (!texto) return;
+    $('copyCriar').disabled = true;
+    copyMsg('Criando…');
+    try {
+      const r = await fetch('/api/copys', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ texto }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'falha ao criar');
+      $('copyTexto').value = '';
+      await loadCopys(true);
+      copyMsg(`Copy "${texto}" criado.`, 'tagOk');
+    } catch (err) {
+      copyMsg(err.message, 'tagErr');
+      $('copyCriar').disabled = false;
+    }
+  });
+  $('copyLoteToggle').addEventListener('click', () => {
+    $('copyLoteBar').classList.toggle('hidden');
+  });
+  $('copyLoteCriar').addEventListener('click', async () => {
+    const textos = $('copyLoteTexto').value.split('\n').map((s) => s.trim()).filter(Boolean);
+    const msgEl = $('copyLoteMsg');
+    if (!textos.length) { msgEl.textContent = 'Cole ao menos um texto (um por linha).'; msgEl.className = 'note tagErr'; return; }
+    $('copyLoteCriar').disabled = true;
+    msgEl.textContent = 'Cadastrando…'; msgEl.className = 'note';
+    try {
+      const r = await fetch('/api/copys/lote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ textos }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'falha ao cadastrar em lote');
+      await loadCopys(true);
+      let msg = `${j.criados.length} copy(s) criado(s).`;
+      if (j.duplicados.length) msg += ` ${j.duplicados.length} já existia(m).`;
+      if (j.erros.length) msg += ` ${j.erros.length} com erro.`;
+      msgEl.textContent = msg;
+      msgEl.className = 'note tagOk';
+      $('copyLoteTexto').value = '';
+    } catch (err) {
+      msgEl.textContent = err.message;
+      msgEl.className = 'note tagErr';
+    } finally {
+      $('copyLoteCriar').disabled = false;
+    }
+  });
+  $('view-copy').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.tagDel');
+    if (!btn) return;
+    const li = btn.closest('li');
+    const texto = li ? li.querySelector('.tagName').textContent : 'esse copy';
+    if (!confirm(`Excluir o copy "${texto}"?`)) return;
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/copys/excluir', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: Number(btn.dataset.id) }),
+      });
+      if (!r.ok) throw new Error('falha ao excluir');
+      await loadCopys(true);
+      copyMsg(`Copy "${texto}" excluído.`, 'tagOk');
+    } catch (err) {
+      copyMsg(err.message, 'tagErr');
+      btn.disabled = false;
+    }
+  });
+
   function idValidate() {
     const ok = !!(idState.categoria && idState.segmento && idState.tag.trim());
     const hint = ok ? '' : 'Escolha categoria, segmento e a tag acima primeiro';
@@ -2400,6 +2575,206 @@
   }
   $('psdUndo').addEventListener('click', undoLastSplit);   // (o listener havia sumido no refactor dos blocos)
 
+  // ================= Elemento "Copy" (texto nativo, com cor e traçado) =================
+  // Renderizado com fillText/strokeText (não é uma imagem pronta) — por isso cor e traçado
+  // são só propriedades redesenhadas no canvas, sem precisar reprocessar pixel a pixel.
+  // Resolução do render fixa (COPY_FONT_SIZE) e margem fixa (COPY_PAD, cobre o traçado mais
+  // grosso possível) para o ow/oh do elemento não mudar ao ligar/ajustar o traçado — assim o
+  // enquadramento (t.w/t.h) já definido em cada editor não distorce.
+  const COPY_FONT_SIZE = 200;
+  const COPY_PAD = 60;
+  function renderCopyCanvas(el) {
+    const mctx = document.createElement('canvas').getContext('2d');
+    mctx.font = `900 ${COPY_FONT_SIZE}px system-ui, Arial, sans-serif`;
+    const tw = Math.max(1, Math.ceil(mctx.measureText(el.text).width));
+    const w = tw + COPY_PAD * 2, h = Math.ceil(COPY_FONT_SIZE * 1.2) + COPY_PAD * 2;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.font = `900 ${COPY_FONT_SIZE}px system-ui, Arial, sans-serif`;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+    const cx = w / 2, cy = h / 2;
+    if (el.strokeOn && el.strokeWidth > 0) {
+      ctx.lineWidth = el.strokeWidth * 2;   // straddla o contorno da letra — a metade externa vira o traçado visível
+      ctx.strokeStyle = el.strokeColor;
+      ctx.strokeText(el.text, cx, cy);
+    }
+    ctx.fillStyle = el.fillColor;
+    ctx.fillText(el.text, cx, cy);
+    el.canvas = cv; el.ow = cv.width; el.oh = cv.height; el.dispSrc = toDisp(cv, 700);
+  }
+  // Reaplica cor/traçado (canvas mantém o mesmo tamanho — ver COPY_PAD) e atualiza a miniatura
+  // da sidebar direto (sem reconstruir a lista, senão o input de cor/slider perde o foco/drag).
+  function renderCopyRegen(el) {
+    renderCopyCanvas(el);
+    const li = layerRows.get(el);
+    if (li) { const thumb = li.querySelector('.psdThumb'); if (thumb) thumb.src = el.dispSrc; }
+    refreshAllBlocks();
+  }
+  // Insere um novo elemento de texto a partir de um copy da biblioteca — some no meio dos
+  // demais elementos (drag/resize/rotate/replicar já funcionam de graça, é um elemento igual
+  // aos outros pro resto do board).
+  function addCopyElement(texto) {
+    if (!PSD) return;
+    const el = {
+      name: texto, kind: 'copy', text: texto,
+      fillColor: '#000000', strokeOn: false, strokeColor: '#ffffff', strokeWidth: 6,
+      canvas: null, ox: 0, oy: 0, ow: 0, oh: 0,
+      isBg: false, visible: true, dispSrc: '', t: null,
+      group: '', isFolder: false, kids: null,
+    };
+    renderCopyCanvas(el);
+    PSD.elements.push(el);
+    $('psdLayersCard').classList.remove('hidden');
+    $('psdMaskCard').classList.remove('hidden');
+    renderPsdLayers();
+    refreshAllBlocks();
+    updateEditorsHint();
+  }
+  $('psdAddCopyBtn').addEventListener('click', async () => {
+    const bar = $('psdAddCopyBar');
+    const opening = bar.classList.contains('hidden');
+    bar.classList.toggle('hidden');
+    if (!opening) return;
+    const sel = $('psdCopySelect');
+    sel.innerHTML = '<option>Carregando…</option>';
+    try {
+      const r = await fetch('/api/copys');
+      const j = await r.json();
+      const copys = j.copys || [];
+      sel.innerHTML = copys.length
+        ? copys.map((c) => `<option value="${esc(c.texto)}">${esc(c.texto)}</option>`).join('')
+        : '<option value="">Nenhum copy cadastrado — crie na aba "Copys"</option>';
+    } catch {
+      sel.innerHTML = '<option value="">Erro ao carregar copys</option>';
+    }
+  });
+  $('psdCopyInserir').addEventListener('click', () => {
+    const texto = $('psdCopySelect').value;
+    if (!texto) return;
+    addCopyElement(texto);
+    $('psdAddCopyBar').classList.add('hidden');
+  });
+
+  // ============ Elemento "Fonte" (guia de customização de nome — NÃO sai no PNG) ============
+  // Mesma mecânica do Copy (texto desenhado num canvas, vira elemento normal do board), com uma
+  // diferença essencial: é só um GUIA para dimensionar o espaço da customização de nome, então
+  // `composeFrom` pula elementos kind==='fonte' — o PNG baixado sai só com a arte.
+  // As fontes são as do Catalog (tabela `fonts`, via /api/fontes); o arquivo é servido pelo host
+  // do engine de customização, com CORS liberado, então dá pra carregar com FontFace.
+  const FONTES = [];
+  let fontesCarregadas = false;
+  const fontesUsadas = new Map();   // url -> family já registrada no document.fonts
+
+  async function loadFontes() {
+    if (fontesCarregadas) return FONTES;
+    const r = await fetch('/api/fontes');
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'falha ao carregar fontes');
+    FONTES.length = 0;
+    (j.fontes || []).forEach((f) => FONTES.push(f));
+    fontesCarregadas = true;
+    return FONTES;
+  }
+
+  /** Carrega o arquivo da fonte e devolve o family name para usar no canvas. */
+  async function garantirFonte(fonte) {
+    if (fontesUsadas.has(fonte.url)) return fontesUsadas.get(fonte.url);
+    const family = 'cat-' + fonte.id;
+    const ff = new FontFace(family, `url(${fonte.url})`);
+    await ff.load();
+    document.fonts.add(ff);
+    fontesUsadas.set(fonte.url, family);
+    return family;
+  }
+
+  const FONTE_SIZE = 200;
+  const FONTE_PAD = 40;
+  function renderFonteCanvas(el) {
+    const mctx = document.createElement('canvas').getContext('2d');
+    const fonte = `${FONTE_SIZE}px "${el.family}", system-ui, sans-serif`;
+    mctx.font = fonte;
+    const tw = Math.max(1, Math.ceil(mctx.measureText(el.text).width));
+    const w = tw + FONTE_PAD * 2, h = Math.ceil(FONTE_SIZE * 1.5) + FONTE_PAD * 2;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d');
+    ctx.font = fonte;
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    ctx.fillStyle = el.fillColor;
+    ctx.fillText(el.text, w / 2, h / 2);
+    el.canvas = cv; el.ow = cv.width; el.oh = cv.height; el.dispSrc = toDisp(cv, 700);
+  }
+  function renderFonteRegen(el) {
+    renderFonteCanvas(el);
+    const li = layerRows.get(el);
+    if (li) { const thumb = li.querySelector('.psdThumb'); if (thumb) thumb.src = el.dispSrc; }
+    refreshAllBlocks();
+  }
+
+  async function addFonteElement(fonte, texto) {
+    if (!PSD) return;
+    const family = await garantirFonte(fonte);
+    const el = {
+      name: fonte.nome, kind: 'fonte', text: texto, family, fonteId: fonte.id,
+      fillColor: '#000000',
+      canvas: null, ox: 0, oy: 0, ow: 0, oh: 0,
+      isBg: false, visible: true, dispSrc: '', t: null,
+      group: '', isFolder: false, kids: null,
+    };
+    renderFonteCanvas(el);
+    PSD.elements.push(el);
+    $('psdLayersCard').classList.remove('hidden');
+    $('psdMaskCard').classList.remove('hidden');
+    renderPsdLayers();
+    refreshAllBlocks();
+    updateEditorsHint();
+  }
+
+  /** Preenche o <select> aplicando o filtro de busca (são ~3 mil fontes). */
+  function psdFonteRenderLista() {
+    const termo = $('psdFonteBusca').value.trim().toLowerCase();
+    const filtradas = termo
+      ? FONTES.filter((f) => f.nome.toLowerCase().includes(termo))
+      : FONTES;
+    const sel = $('psdFonteSelect');
+    sel.innerHTML = filtradas.slice(0, 300)
+      .map((f) => `<option value="${f.id}">${esc(f.nome)}</option>`).join('')
+      || '<option value="">Nenhuma fonte encontrada</option>';
+    const sobra = filtradas.length - 300;
+    $('psdFonteInserir').textContent = sobra > 0 ? `Inserir (+${sobra} filtrando)` : 'Inserir';
+  }
+
+  $('psdAddFonteBtn').addEventListener('click', async () => {
+    const bar = $('psdAddFonteBar');
+    const abrindo = bar.classList.contains('hidden');
+    bar.classList.toggle('hidden');
+    if (!abrindo) return;
+    const sel = $('psdFonteSelect');
+    sel.innerHTML = '<option>Carregando…</option>';
+    try {
+      await loadFontes();
+      psdFonteRenderLista();
+    } catch (err) {
+      sel.innerHTML = `<option value="">${esc(err.message)}</option>`;
+    }
+  });
+  $('psdFonteBusca').addEventListener('input', () => { if (fontesCarregadas) psdFonteRenderLista(); });
+  $('psdFonteInserir').addEventListener('click', async () => {
+    const id = Number($('psdFonteSelect').value);
+    const fonte = FONTES.find((f) => f.id === id);
+    const texto = $('psdFonteTexto').value.trim() || 'Seu Nome';
+    if (!fonte) return;
+    const btn = $('psdFonteInserir');
+    const antes = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Carregando fonte…';
+    try {
+      await addFonteElement(fonte, texto);
+      $('psdAddFonteBar').classList.add('hidden');
+    } catch (err) {
+      alert('Não consegui carregar essa fonte: ' + err.message);
+    }
+    btn.disabled = false; btn.textContent = antes;
+  });
+
   // Exclui uma camada (fundo ou elemento). Reaproveita a pilha de "Desfazer" existente:
   // registra a operação como "el vira []" — undoLastSplit sabe recolocar o original de volta.
   function deleteLayer(el) {
@@ -2426,6 +2801,8 @@
       name: el.name + ' cópia', canvas: el.canvas, ox: el.ox, oy: el.oy, ow: el.ow, oh: el.oh,
       isBg: el.isBg, visible: el.visible, dispSrc: el.dispSrc, t: null,
       group: el.group, isFolder: el.isFolder, kids: el.kids,
+      kind: el.kind, text: el.text, fillColor: el.fillColor,
+      strokeOn: el.strokeOn, strokeColor: el.strokeColor, strokeWidth: el.strokeWidth,
     };
   }
   // Ctrl+C — guarda as camadas selecionadas no editor ativo.
@@ -2603,18 +2980,39 @@
     layerRows = new Map();
     // exibe do topo para baixo (inverso do z-order) — mais intuitivo
     PSD.elements.slice().reverse().forEach((el) => {
+      const isCopy = el.kind === 'copy';
+      const isFonte = el.kind === 'fonte';
       const li = document.createElement('li');
-      li.className = 'psdLayer' + (el.isBg ? ' bg' : '');
-      li.innerHTML =
+      li.className = 'psdLayer' + (el.isBg ? ' bg' : '') + (isCopy ? ' copyLayer' : '') + (isFonte ? ' fonteLayer' : '');
+      const mainHtml =
         `<img class="psdThumb" src="${el.dispSrc}" alt="">` +
         `<span class="psdLayerName">${el.isFolder ? '📂 ' : ''}${esc(el.name)}` +
           (el.group ? `<span class="psdGroupTag">${esc(el.group)}</span>` : '') + `</span>` +
         (el.isFolder ? `<button class="psdLayerBadge psdOpenFolder" title="Separar as camadas de dentro">abrir pasta</button>` : '') +
-        (!el.isFolder && !el.isBg ? `<button class="psdLayerBadge psdSplit" title="Separar motivos que estão juntos nesta camada (ilhas de pixels)">separar</button>` : '') +
-        `<span class="psdLayerBadge psdKind">${el.isBg ? 'fundo' : 'elemento'}</span>` +
-        (!el.isBg ? `<button class="psdStar${PSD.starEl === el ? ' on' : ''}" title="Elemento principal (centralizado em destaque)">⭐</button>` : '') +
+        (!el.isFolder && !el.isBg && !isCopy && !isFonte ? `<button class="psdLayerBadge psdSplit" title="Separar motivos que estão juntos nesta camada (ilhas de pixels)">separar</button>` : '') +
+        (isFonte
+          ? `<span class="psdLayerBadge psdGuia" title="Guia de composição — não entra no PNG baixado">guia · não sai no PNG</span>`
+          : `<span class="psdLayerBadge psdKind">${el.isBg ? 'fundo' : 'elemento'}</span>`) +
+        (!el.isBg && !isFonte ? `<button class="psdStar${PSD.starEl === el ? ' on' : ''}" title="Elemento principal (centralizado em destaque)">⭐</button>` : '') +
         `<button class="psdEye" title="Mostrar/ocultar">👁</button>` +
         `<button class="psdDel" title="Excluir camada">🗑</button>`;
+      const copyControlsHtml = isCopy
+        ? `<div class="psdCopyControls">` +
+            `<span class="psdCopyLabel">cor</span>` +
+            `<input type="color" class="psdCopyColor" value="${el.fillColor}" title="Cor do texto">` +
+            `<button type="button" class="psdLayerBadge psdCopyStrokeToggle${el.strokeOn ? ' on' : ''}" title="Ativar/desativar traçado">traçado</button>` +
+            `<input type="color" class="psdCopyStrokeColor${el.strokeOn ? '' : ' hidden'}" value="${el.strokeColor}" title="Cor do traçado">` +
+            `<input type="range" class="psdCopyStrokeWidth${el.strokeOn ? '' : ' hidden'}" min="1" max="20" value="${el.strokeWidth}" title="Espessura do traçado">` +
+          `</div>`
+        : '';
+      const fonteControlsHtml = isFonte
+        ? `<div class="psdCopyControls">` +
+            `<span class="psdCopyLabel">cor</span>` +
+            `<input type="color" class="psdFonteColor" value="${el.fillColor}" title="Cor do texto-guia">` +
+            `<input type="text" class="psdFonteText amInput" value="${esc(el.text)}" maxlength="40" title="Texto de exemplo">` +
+          `</div>`
+        : '';
+      li.innerHTML = `<div class="psdLayerMain">${mainHtml}</div>${copyControlsHtml}${fonteControlsHtml}`;
       const starBtn = li.querySelector('.psdStar');
       if (starBtn) starBtn.addEventListener('click', () => {
         PSD.starEl = (PSD.starEl === el) ? null : el;
@@ -2622,7 +3020,8 @@
         refreshAllBlocks();    // recompoe com o principal centralizado
       });
       const badge = li.querySelector('.psdKind');
-      badge.addEventListener('click', () => {
+      // Camada "fonte" não tem esse badge (é guia, nunca vira fundo).
+      if (badge) badge.addEventListener('click', () => {
         el.isBg = !el.isBg;
         li.classList.toggle('bg', el.isBg);
         badge.textContent = el.isBg ? 'fundo' : 'elemento';
@@ -2640,10 +3039,32 @@
       });
       const delBtn = li.querySelector('.psdDel');
       delBtn.addEventListener('click', () => deleteLayer(el));
+      if (isFonte) {
+        const cor = li.querySelector('.psdFonteColor');
+        cor.addEventListener('input', () => { el.fillColor = cor.value; renderFonteRegen(el); });
+        const txt = li.querySelector('.psdFonteText');
+        txt.addEventListener('input', () => { el.text = txt.value || 'Seu Nome'; renderFonteRegen(el); });
+      }
+      if (isCopy) {
+        const colorInput = li.querySelector('.psdCopyColor');
+        colorInput.addEventListener('input', () => { el.fillColor = colorInput.value; renderCopyRegen(el); });
+        const strokeToggle = li.querySelector('.psdCopyStrokeToggle');
+        const strokeColorInput = li.querySelector('.psdCopyStrokeColor');
+        const strokeWidthInput = li.querySelector('.psdCopyStrokeWidth');
+        strokeToggle.addEventListener('click', () => {
+          el.strokeOn = !el.strokeOn;
+          strokeToggle.classList.toggle('on', el.strokeOn);
+          strokeColorInput.classList.toggle('hidden', !el.strokeOn);
+          strokeWidthInput.classList.toggle('hidden', !el.strokeOn);
+          renderCopyRegen(el);
+        });
+        strokeColorInput.addEventListener('input', () => { el.strokeColor = strokeColorInput.value; renderCopyRegen(el); });
+        strokeWidthInput.addEventListener('input', () => { el.strokeWidth = Number(strokeWidthInput.value); renderCopyRegen(el); });
+      }
       li.addEventListener('mouseenter', () => peekElement(el, true));
       li.addEventListener('mouseleave', () => peekElement(el, false));
       li.addEventListener('click', (ev) => {
-        if (ev.target.closest('button')) return; // não rouba o clique de ⭐/pasta/separar/👁/🗑
+        if (ev.target.closest('button') || ev.target.closest('input')) return; // não rouba o clique de ⭐/pasta/separar/👁/🗑/cor/traçado
         selectElementEverywhere(el);
       });
       layerRows.set(el, li);
@@ -2664,11 +3085,27 @@
   // ===== Cálculo de layout (puro): retorna { T: Map(e->{x,y,w,h}), onlyStar, star } =====
   // Tipo Pattern (estilos Stickers/Linear/Distribuído) preenche a máscara (rapport sempre ligado).
   // Tipo Localizada (estilo Estrela) mostra SÓ o elemento ⭐, centralizado; os demais são removidos.
+  /**
+   * Guias de fonte ficam FORA dos algoritmos de arranjo (não são arte: não entram no pattern nem
+   * na distribuição). Sempre centralizados, num tamanho pequeno-médio — é o espaço que a
+   * customização de nome vai ocupar.
+   */
+  function posicionaGuias(guias, W, H, T) {
+    for (const g of guias) {
+      const s = Math.min((W * 0.45) / g.ow, (H * 0.35) / g.oh);
+      const w = g.ow * s, h = g.oh * s;
+      T.set(g, { w, h, x: (W - w) / 2, y: (H - h) / 2 });
+    }
+  }
+
   function layoutCompute(mk, S) {
     const T = new Map();
     const W = mk.w, H = mk.h;
-    const allFg = fgElements();
-    if (!allFg.length) return { T, onlyStar: false, star: null };
+    const todos = fgElements();
+    const guias = todos.filter((e) => e.kind === 'fonte');
+    const allFg = todos.filter((e) => e.kind !== 'fonte');
+    posicionaGuias(guias, W, H, T);
+    if (!allFg.length) return { T, onlyStar: false, star: null, guias };
     const star = (PSD.starEl && allFg.includes(PSD.starEl)) ? PSD.starEl : null;
 
     if (S.tipo === 'localizada') {
@@ -2677,10 +3114,10 @@
         const s = (Math.min(W, H) * 0.62) / Math.max(star.ow, star.oh);
         const w = star.ow * s, h = star.oh * s;
         T.set(star, { w, h, x: (W - w) / 2, y: (H - h) / 2 });
-        return { T, onlyStar: true, star };
+        return { T, onlyStar: true, star, guias };
       }
       autoCompute(mk, 'center', S, T, allFg);
-      return { T, onlyStar: false, star: null };
+      return { T, onlyStar: false, star: null, guias };
     }
 
     // Pattern: preenche a máscara. Camadas full-canvas cobrem; os motivos distribuem.
@@ -2691,7 +3128,7 @@
       const motifs = allFg.filter((e) => !isSpanning(e));
       fillGridNoOverlap(motifs, W, H, T, S.estilo === 'distribuido');   // linear (grade) ou distribuído (xadrez)
     }
-    return { T, onlyStar: false, star: null };
+    return { T, onlyStar: false, star: null, guias };
   }
 
   function autoCompute(mk, mode, S, T, fg) {
@@ -2791,7 +3228,9 @@
     const mk = PSD_MASKS[ed.maskIdx], W = mk.w, H = mk.h, S = ed.S, L = ed.layout;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-    const els = L.onlyStar ? [L.star] : fgElements();
+    // Elementos "fonte" são GUIA de composição (customização de nome): aparecem no board para
+    // dimensionar o espaço, mas nunca no arquivo final — por isso ficam de fora aqui.
+    const els = (L.onlyStar ? [L.star] : fgElements()).filter((e) => e && e.kind !== 'fonte');
     const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
     for (const e of els) {
       const t = L.T.get(e); if (!t) continue;
@@ -2944,14 +3383,17 @@
     const prevSelArr = Array.from(ed.selSet);
     stage.innerHTML = ''; ed.nodes = new Map(); ed.selSet = new Set();
     const wraps = L.onlyStar ? [] : wrapOffsets(mk, S);
-    const els = L.onlyStar ? [L.star] : fgElements();
+    // No modo Estrela só o principal aparece, mas as guias de fonte continuam visíveis —
+    // é justamente nesse layout que dá pra ver se sobra espaço para o nome.
+    const els = L.onlyStar ? [L.star, ...(L.guias || [])] : fgElements();
     for (const e of els) {
       const t = L.T.get(e); if (!t) continue;
-      const d = document.createElement('div'); d.className = 'psdEl';
+      const ehGuia = e.kind === 'fonte';
+      const d = document.createElement('div'); d.className = 'psdEl' + (ehGuia ? ' guia' : '');
       d.innerHTML = `<img src="${e.dispSrc}" alt=""><span class="psdRotateHandle" title="Girar"></span><span class="psdHandle"></span>`;
       const rec = { node: d, ghosts: [] };
       ed.nodes.set(e, rec); edAttachDrag(ed, d, e); stage.appendChild(d);
-      for (const o of wraps) {
+      for (const o of (ehGuia ? [] : wraps)) {
         const g = document.createElement('div'); g.className = 'psdEl ghost'; g.dataset.dx = String(o.dx); g.dataset.dy = String(o.dy);
         g.innerHTML = `<img src="${e.dispSrc}" alt="">`;
         rec.ghosts.push(g); stage.appendChild(g);
@@ -3031,7 +3473,7 @@
         const w = t.w * s, h = t.h * s;
         T.set(el, { x: cxF * W - w / 2, y: cyF * H - h / 2, w, h, rot: t.rot || 0 });
       });
-      ed.layout = { T, onlyStar: prim.layout.onlyStar, star: prim.layout.star };
+      ed.layout = { T, onlyStar: prim.layout.onlyStar, star: prim.layout.star, guias: prim.layout.guias };
       if (ed.dom) edRenderStage(ed);
     }
   }

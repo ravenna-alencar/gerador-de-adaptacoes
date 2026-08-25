@@ -48,10 +48,10 @@ interface Env {
   DB: Db;
 }
 
-function json(body: unknown, status = 200): Response {
+function json(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { 'content-type': 'application/json; charset=utf-8', ...(extraHeaders || {}) },
   });
 }
 
@@ -239,6 +239,48 @@ async function ensureTagsTable(env: Env): Promise<void> {
     `CREATE UNIQUE INDEX IF NOT EXISTS tags_cat_nome ON tags (categoria, nome_norm)`,
     [],
   );
+}
+
+/**
+ * Copys — biblioteca de textos ("copy") cadastrados de antemão, disponíveis para inserir como
+ * elemento de texto no board de adaptação (Novo ID / Adaptar ID). Lista simples, sem categoria:
+ * cor, tamanho e traçado são propriedades de CADA instância inserida no board, não do cadastro.
+ * `texto_norm` existe só para impedir duplicata por espaço/caixa.
+ */
+// Seed único: legendas de copyright/marca registrada extraídas de "Copy_para_editar.psd" (Wellington,
+// 2026-08-25) — as 11 camadas de texto do arquivo (o resto eram camadas raster). INSERT OR IGNORE
+// é idempotente: não duplica em chamadas futuras, graças ao UNIQUE de texto_norm criado abaixo.
+const COPYS_SEED = [
+  '© MARVEL',
+  '©Disney',
+  '©Disney/Pixar',
+  '©Mattel.',
+  '©&™Lucasfilm Ltd',
+  '© & ™ WBEI (s26)',
+  '© & ™ HBO (s26)',
+  '© & ™ DC. (s25)',
+  '© & ™ CN. (s25)',
+  '©2026 Paws, Inc.',
+  '© 2026 &TM Spin Master Ltd.',
+];
+async function ensureCopysTable(env: Env): Promise<void> {
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS copys (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_email TEXT,
+      texto TEXT NOT NULL,
+      texto_norm TEXT NOT NULL
+    )`,
+    [],
+  );
+  await env.DB.exec(`CREATE UNIQUE INDEX IF NOT EXISTS copys_texto_norm ON copys (texto_norm)`, []);
+  for (const texto of COPYS_SEED) {
+    await env.DB.exec(
+      `INSERT OR IGNORE INTO copys (created_at, user_email, texto, texto_norm) VALUES (?, ?, ?, ?)`,
+      [new Date().toISOString(), null, texto, slugify(texto)],
+    );
+  }
 }
 
 /**
@@ -918,6 +960,28 @@ export default {
         });
       }
 
+      // ---- Fontes de customização (Catalog/Prisma) ----
+      // A tabela `fonts` (db 19) guarda só o CAMINHO do arquivo, num JSON tipo
+      // {"id":"font/1/file/<hash>.ttf","storage":"store",...}. O arquivo em si é servido
+      // publicamente pelo host do engine de customização (mesma base que o Prisma usa no site,
+      // descoberta no bundle do engine), com CORS liberado — então o navegador carrega a fonte
+      // direto, sem proxy. Cache de 1h: a lista quase não muda e são ~3k linhas.
+      if (pathname === '/api/fontes') {
+        if (!env.METABASE_TOKEN) return json({ error: 'METABASE_TOKEN não configurado' }, 500);
+        const rows = await metabaseQuery(
+          env,
+          `SELECT id, name, file_data FROM fonts
+           WHERE file_data IS NOT NULL AND file_data <> '' ORDER BY name`,
+        );
+        const BASE = 'https://static-goengines.gocase.com.br/uploads/';
+        const fontes = rows.map((r) => {
+          let caminho = '';
+          try { caminho = String((JSON.parse(String(r.file_data)) as { id?: string }).id || ''); } catch { /* linha com JSON inválido — ignorada abaixo */ }
+          return { id: Number(r.id), nome: String(r.name || ''), url: caminho ? BASE + caminho : '' };
+        }).filter((f) => f.url && /\.(ttf|otf|woff2?)$/i.test(f.url));
+        return json({ fontes }, 200, { 'cache-control': 'public, max-age=3600' });
+      }
+
       // ---- Alocação de um item existente numa tag (aba "Adaptar ID") ----
       if (pathname === '/api/estampas/alocar-tag' && request.method === 'POST') {
         await ensureAlocacoesTable(env);
@@ -966,6 +1030,83 @@ export default {
         if (!id) return json({ error: 'id obrigatório' }, 400);
         await env.DB.exec('DELETE FROM tags WHERE id = ?', [id]);
         return json({ ok: true });
+      }
+
+      // ---- Copys (página "Copys") — biblioteca de textos p/ inserir como elemento no board ----
+      if (pathname === '/api/copys' && request.method === 'GET') {
+        await ensureCopysTable(env);
+        const r = await env.DB.query(
+          `SELECT id, texto, created_at, user_email FROM copys ORDER BY texto COLLATE NOCASE`,
+          [],
+        );
+        const copys = r.rows.map((row) => ({
+          id: Number(row.id),
+          texto: String(row.texto),
+          criadoEm: String(row.created_at || ''),
+          criadoPor: displayNameFromEmail(row.user_email as string | null),
+        }));
+        return json({ copys });
+      }
+
+      if (pathname === '/api/copys' && request.method === 'POST') {
+        await ensureCopysTable(env);
+        const body = (await request.json()) as { texto?: string };
+        const texto = String(body.texto || '').trim().replace(/\s+/g, ' ');
+        if (!texto) return json({ error: 'texto é obrigatório' }, 400);
+        if (texto.length > 120) return json({ error: 'texto muito longo (máx. 120 caracteres)' }, 400);
+        const textoNorm = slugify(texto);
+        const dup = await env.DB.query(`SELECT texto FROM copys WHERE texto_norm = ?`, [textoNorm]);
+        if (dup.rows.length) {
+          return json({ error: `já existe um copy "${String(dup.rows[0].texto)}"` }, 409);
+        }
+        await env.DB.exec(
+          `INSERT INTO copys (created_at, user_email, texto, texto_norm) VALUES (?, ?, ?, ?)`,
+          [new Date().toISOString(), request.headers.get('x-godeploy-user-email') || null, texto, textoNorm],
+        );
+        const idRes = await env.DB.query('SELECT last_insert_rowid() AS id', []);
+        return json({ ok: true, copy: { id: Number(idRes.rows[0]?.id ?? 0), texto } });
+      }
+
+      if (pathname === '/api/copys/excluir' && request.method === 'POST') {
+        await ensureCopysTable(env);
+        const body = (await request.json()) as { id?: number };
+        const id = Number(body.id);
+        if (!id) return json({ error: 'id obrigatório' }, 400);
+        await env.DB.exec('DELETE FROM copys WHERE id = ?', [id]);
+        return json({ ok: true });
+      }
+
+      // Cadastro em lote — usado pra colar vários copys de uma vez (ex.: legendas de
+      // copyright extraídas de um PSD) em vez de repetir POST /api/copys um por um.
+      // Cada texto passa pela mesma validação/normalização/dedupe do cadastro individual;
+      // duplicatas (já existentes OU repetidas dentro do próprio lote) não travam o resto.
+      if (pathname === '/api/copys/lote' && request.method === 'POST') {
+        await ensureCopysTable(env);
+        const body = (await request.json()) as { textos?: string[] };
+        const textos = Array.isArray(body.textos)
+          ? body.textos.map((t) => String(t || '').trim().replace(/\s+/g, ' ')).filter(Boolean)
+          : [];
+        if (!textos.length) return json({ error: 'textos obrigatório (lista não vazia)' }, 400);
+        const userEmail = request.headers.get('x-godeploy-user-email') || null;
+        const criados: string[] = [];
+        const duplicados: string[] = [];
+        const erros: { texto: string; error: string }[] = [];
+        for (const texto of textos) {
+          if (texto.length > 120) { erros.push({ texto, error: 'texto muito longo (máx. 120 caracteres)' }); continue; }
+          const textoNorm = slugify(texto);
+          try {
+            const dup = await env.DB.query('SELECT id FROM copys WHERE texto_norm = ?', [textoNorm]);
+            if (dup.rows.length) { duplicados.push(texto); continue; }
+            await env.DB.exec(
+              `INSERT INTO copys (created_at, user_email, texto, texto_norm) VALUES (?, ?, ?, ?)`,
+              [new Date().toISOString(), userEmail, texto, textoNorm],
+            );
+            criados.push(texto);
+          } catch (e) {
+            erros.push({ texto, error: String((e as Error).message || e) });
+          }
+        }
+        return json({ ok: true, criados, duplicados, erros });
       }
 
       // Sugere 3 nomes para a estampa (Etapa 0 da aba "Adaptar PSD"), a partir do
