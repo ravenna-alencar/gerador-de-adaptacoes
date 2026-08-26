@@ -214,13 +214,21 @@ O app NÃO tem dados próprios de catálogo; consulta bancos externos:
 
 - `GET  /api/rpa/config` — grupos de adaptação e materiais base por categoria + `configurado` (se os segredos do GitHub existem).
 - `POST /api/rpa/lote` — cria o lote (só metadados) → `{job_id, arquivos}`. Valida identifier (`^[a-z0-9][a-z0-9-]{1,80}$`), duplicata e categoria; máx. 50 estampas.
-- `POST /api/rpa/lote/imagem {job_id, arquivo, dataUrl}` — **um PNG por chamada** (evita estourar o tamanho de requisição); grava em `jobs/<job_id>/` no branch `jobs` do repo do robô. Máx. 25MB, só PNG.
-- `POST /api/rpa/lote/disparar {job_id}` — monta o `config.json` a partir do banco e chama o `workflow_dispatch`.
-- `POST /api/rpa/progresso` / `POST /api/rpa/finalizar` — **o robô** reportando (exige header `x-rpa-token` = segredo `RPA_TOKEN`).
+- `POST /api/rpa/lote/imagem {job_id, arquivo, parte, total_partes, dadosB64}` — **um pedaço por chamada** (~384KB de base64); guardado em `rpa_imagens`. Só aceita lote em `montando`.
+- `POST /api/rpa/lote/disparar {job_id}` — só chama o `workflow_dispatch` com o `job_id`. Nenhum arquivo sai daqui.
+- `GET  /api/rpa/job?job=` + `GET /api/rpa/imagem?job=&arquivo=` — **o robô** buscando a receita e os bytes do PNG (exigem `x-rpa-token`).
+- `POST /api/rpa/progresso` / `POST /api/rpa/finalizar` — **o robô** reportando (mesmo token). `finalizar` apaga as imagens do lote.
 - `GET  /api/rpa/status?job=&desde=` — polling da tela (2,5s), devolve o job + eventos novos desde o id `desde`.
 - `GET  /api/rpa/lotes` — histórico (últimos 20) de quem está olhando.
 
-Tabelas próprias em `env.DB`: `rpa_jobs`, `rpa_estampas`, `rpa_eventos` (criadas por `ensureRpaTables`).
+Tabelas próprias em `env.DB`: `rpa_jobs`, `rpa_estampas`, `rpa_eventos`, `rpa_imagens` (criadas por `ensureRpaTables`).
+
+> **Por que as imagens não passam pelo GitHub:** os repositórios (`catalog-estampas-app` e este)
+> são **públicos**. PNG commitado num branch = arte da Gocase exposta na internet, e o git guarda no
+> histórico mesmo depois de apagado. Então os PNGs moram no `env.DB` em pedaços (uma estampa passa
+> fácil de 5MB, e linha gigante de SQLite é pedir problema) e o robô os baixa autenticado. Pelo mesmo
+> motivo o workflow **não** sobe a pasta `debug/` como artefato: artefato de repo público é baixável
+> por qualquer um.
 
 ---
 
@@ -231,9 +239,9 @@ Tabelas próprias em `env.DB`: `rpa_jobs`, `rpa_estampas`, `rpa_eventos` (criada
 - `REMOVEBG_KEY` — remove.bg (**plano free = saída 0.25MP**; upgrade pago = alta resolução).
 - `METABASE_TOKEN` — API key do Metabase (`mb_...`) p/ consultar o Catalog (db 19).
 - `PROXY_BASE_URL` — injetado pelo GoDeploy (proxy de dados do Site).
-- `GITHUB_TOKEN` + `GITHUB_REPO` — acionam o robô de cadastro (repo privado `rpaiagogroup/catalog-estampas-rpa`). Sem eles a aba "Cadastrar no Catalog" aparece com aviso e botão desabilitado; o resto do app não muda.
+- `GITHUB_TOKEN` + `GITHUB_REPO` — acionam o robô de cadastro (repo `rianmesquita-cloud/catalog-estampas-app`). Sem eles a aba "Cadastrar no Catalog" aparece com aviso e botão desabilitado; o resto do app não muda.
 - `RPA_TOKEN` — senha combinada com o robô; sem ela `/api/rpa/progresso` e `/api/rpa/finalizar` respondem 401.
-- Opcionais: `GITHUB_REF` (default `main`), `GITHUB_JOBS_BRANCH` (default `jobs`), `GITHUB_WORKFLOW` (default `cadastrar-estampas.yml`).
+- Opcionais: `GITHUB_REF` (default `main`), `GITHUB_WORKFLOW` (default `cadastrar-estampas.yml`).
 
 > **A sessão do Catalog nunca passa por este app.** Ela é segredo do GitHub (`CATALOG_AUTH_STATE`),
 > lida só dentro do Actions. Setup completo em `SETUP-NUVEM.md`, no repositório do robô.

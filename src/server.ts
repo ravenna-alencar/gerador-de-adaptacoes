@@ -49,7 +49,6 @@ interface Env {
   GITHUB_TOKEN?: string;        // token com acesso ao repo do robô (Actions + conteúdo)
   GITHUB_REPO?: string;         // "owner/repo" do robô
   GITHUB_REF?: string;          // branch do código (default: main)
-  GITHUB_JOBS_BRANCH?: string;  // branch onde os arquivos do lote ficam (default: jobs)
   GITHUB_WORKFLOW?: string;     // arquivo do workflow (default: cadastrar-estampas.yml)
   RPA_TOKEN?: string;           // segredo compartilhado: só o robô pode reportar progresso
   DB: Db;
@@ -897,15 +896,19 @@ function prettyIdentifier(id: string): string {
    que roda no GitHub Actions (aqui dentro não existe navegador). O caminho:
 
      tela  ->  POST /api/rpa/lote            cria o lote (metadados)
-           ->  POST /api/rpa/lote/imagem     um PNG por chamada, vai pro GitHub
-           ->  POST /api/rpa/lote/disparar   grava o config.json e chama o Actions
-     robô  ->  POST /api/rpa/progresso       cada passo que ele dá
-           ->  POST /api/rpa/finalizar       fim do lote
+           ->  POST /api/rpa/lote/imagem     PNG em pedaços, guardados no env.DB
+           ->  POST /api/rpa/lote/disparar   só avisa o Actions ("roda o job X")
+     robô  ->  GET  /api/rpa/job?job=        pega a receita do lote
+           ->  GET  /api/rpa/imagem?job=&…   baixa cada PNG
+           ->  POST /api/rpa/progresso       cada passo que ele dá
+           ->  POST /api/rpa/finalizar       fim do lote (apaga as imagens)
      tela  ->  GET  /api/rpa/status?job=     pergunta de 2 em 2s e mostra ao vivo
 
-   Os PNGs moram no branch "jobs" do repositório do robô (o Actions já baixa
-   o repositório de qualquer jeito, então não precisa de storage novo) e são
-   apagados pelo próprio workflow no fim, dê certo ou dê errado.
+   **As imagens nunca passam pelo GitHub.** Os repositórios são públicos, e
+   arte da Gocase num repositório público fica exposta na internet -- e o git
+   guarda o arquivo no histórico mesmo depois de apagado. Então os PNGs moram
+   no banco do app (em pedaços, porque uma estampa passa fácil de 5MB) e o robô
+   os baixa autenticado. O GitHub só recebe o id do lote.
 
    A sessão do Catalog NÃO passa por aqui: ela é um segredo do GitHub, usada
    só dentro do Actions. Este worker nunca vê credencial do Catalog.
@@ -993,6 +996,23 @@ async function ensureRpaTables(env: Env): Promise<void> {
     [],
   );
   await env.DB.exec(`CREATE INDEX IF NOT EXISTS rpa_eventos_job ON rpa_eventos (job_id, id)`, []);
+  // Os PNGs entram em pedaços (uma estampa passa fácil de 5MB, e linha gigante
+  // de SQLite é pedir problema). Apagados quando o lote termina.
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS rpa_imagens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      arquivo TEXT NOT NULL,
+      parte INTEGER NOT NULL,
+      total_partes INTEGER NOT NULL,
+      dados TEXT NOT NULL
+    )`,
+    [],
+  );
+  await env.DB.exec(
+    `CREATE UNIQUE INDEX IF NOT EXISTS rpa_imagens_parte ON rpa_imagens (job_id, arquivo, parte)`,
+    [],
+  );
 }
 
 function rpaGhHeaders(env: Env): Record<string, string> {
@@ -1012,52 +1032,26 @@ function rpaGhConfig(env: Env) {
   return {
     repo: env.GITHUB_REPO,
     ref: env.GITHUB_REF || 'main',
-    branch: env.GITHUB_JOBS_BRANCH || 'jobs',
     workflow: env.GITHUB_WORKFLOW || 'cadastrar-estampas.yml',
   };
 }
 
-/** Garante que o branch dos arquivos de lote existe (na primeira vez ele não existe). */
-async function rpaGhEnsureBranch(env: Env): Promise<void> {
-  const { repo, ref, branch } = rpaGhConfig(env);
-  const existe = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${branch}`, {
-    headers: rpaGhHeaders(env),
-  });
-  if (existe.ok) return;
+/** Junta os pedaços de um PNG guardado no banco. Devolve null se faltar pedaço. */
+async function rpaMontarImagem(env: Env, jobId: string, arquivo: string): Promise<Uint8Array | null> {
+  const r = await env.DB.query(
+    `SELECT parte, total_partes, dados FROM rpa_imagens
+       WHERE job_id = ? AND arquivo = ? ORDER BY parte`,
+    [jobId, arquivo],
+  );
+  if (!r.rows.length) return null;
+  const total = Number(r.rows[0].total_partes);
+  if (r.rows.length !== total) return null;
 
-  const base = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${ref}`, {
-    headers: rpaGhHeaders(env),
-  });
-  if (!base.ok) throw new Error(`Não achei o branch "${ref}" no repositório do robô (${base.status}).`);
-  const sha = ((await base.json()) as { object: { sha: string } }).object.sha;
-
-  const criado = await fetch(`https://api.github.com/repos/${repo}/git/refs`, {
-    method: 'POST',
-    headers: rpaGhHeaders(env),
-    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
-  });
-  // 422 = alguém criou entre a checagem e agora; não é erro pra gente.
-  if (!criado.ok && criado.status !== 422) {
-    throw new Error(`Não consegui criar o branch "${branch}": ${criado.status} ${await criado.text()}`);
-  }
-}
-
-/** Grava (ou substitui) um arquivo no branch dos lotes. `conteudoB64` é base64 puro. */
-async function rpaGhPutFile(env: Env, caminho: string, conteudoB64: string, mensagem: string): Promise<void> {
-  const { repo, branch } = rpaGhConfig(env);
-  const url = `https://api.github.com/repos/${repo}/contents/${caminho}`;
-
-  // Se o arquivo já existe, o GitHub exige o sha do anterior pra substituir.
-  let sha: string | undefined;
-  const atual = await fetch(`${url}?ref=${branch}`, { headers: rpaGhHeaders(env) });
-  if (atual.ok) sha = ((await atual.json()) as { sha?: string }).sha;
-
-  const r = await fetch(url, {
-    method: 'PUT',
-    headers: rpaGhHeaders(env),
-    body: JSON.stringify({ message: mensagem, content: conteudoB64, branch, ...(sha ? { sha } : {}) }),
-  });
-  if (!r.ok) throw new Error(`O GitHub recusou o arquivo ${caminho}: ${r.status} ${await r.text()}`);
+  const b64 = r.rows.map((row) => String(row.dados)).join('');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
 async function rpaGhDispatch(env: Env, jobId: string): Promise<string> {
@@ -1073,14 +1067,6 @@ async function rpaGhDispatch(env: Env, jobId: string): Promise<string> {
 
 const RPA_ID_VALIDO = /^[a-z0-9][a-z0-9-]{1,80}$/;
 
-/** Texto (com acento) -> base64, do jeito que o GitHub espera. Sem `unescape`,
- *  que é global legado e não dá pra contar com ele no worker. */
-function rpaTextoParaB64(texto: string): string {
-  const bytes = new TextEncoder().encode(texto);
-  let bin = '';
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
-}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -1157,33 +1143,54 @@ export default {
         return json({ job_id: jobId, arquivos });
       }
 
-      // Passo 2: uma imagem por chamada (evita estourar o tamanho de requisição).
+      // Passo 2: os PNGs, em pedaços. Um pedaço por chamada -- requisição pequena
+      // e a tela consegue mostrar progresso real de upload.
       if (pathname === '/api/rpa/lote/imagem' && request.method === 'POST') {
         await ensureRpaTables(env);
-        const body = (await request.json()) as { job_id?: string; arquivo?: string; dataUrl?: string };
+        const body = (await request.json()) as {
+          job_id?: string; arquivo?: string; parte?: number; total_partes?: number; dadosB64?: string;
+        };
         const jobId = String(body.job_id || '');
         const arquivo = String(body.arquivo || '');
-        if (!jobId || !arquivo || !body.dataUrl) return json({ error: 'job_id, arquivo e dataUrl obrigatórios' }, 400);
+        const parte = Number(body.parte);
+        const totalPartes = Number(body.total_partes);
+        if (!jobId || !arquivo || !body.dadosB64 || !Number.isInteger(parte) || !Number.isInteger(totalPartes)) {
+          return json({ error: 'job_id, arquivo, parte, total_partes e dadosB64 obrigatórios' }, 400);
+        }
+        if (totalPartes < 1 || totalPartes > 200 || parte < 0 || parte >= totalPartes) {
+          return json({ error: 'numeração de pedaços inválida' }, 400);
+        }
+        if (String(body.dadosB64).length > 700_000) {
+          return json({ error: 'pedaço muito grande (máx. ~512KB por chamada)' }, 400);
+        }
 
         const dono = await env.DB.query(
-          `SELECT job_id FROM rpa_estampas WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+          `SELECT e.arquivo FROM rpa_estampas e
+             JOIN rpa_jobs j ON j.job_id = e.job_id
+            WHERE e.job_id = ? AND e.arquivo = ? AND j.status = 'montando'`,
+          [jobId, arquivo],
         );
-        if (!dono.rows.length) return json({ error: 'arquivo não faz parte deste lote' }, 404);
+        if (!dono.rows.length) return json({ error: 'arquivo não faz parte de um lote em montagem' }, 404);
 
-        const { bytes, mime } = decodeDataUrl(String(body.dataUrl));
-        if (mime !== 'image/png') return json({ error: `a estampa precisa ser PNG (recebi ${mime})` }, 400);
-        if (bytes.length > 25 * 1024 * 1024) return json({ error: 'imagem acima de 25MB' }, 400);
-
-        await rpaGhEnsureBranch(env);
-        const b64 = String(body.dataUrl).split(',')[1];
-        await rpaGhPutFile(env, `jobs/${jobId}/${arquivo}`, b64, `job ${jobId}: ${arquivo}`);
         await env.DB.exec(
-          `UPDATE rpa_estampas SET enviada = 1 WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+          `INSERT OR REPLACE INTO rpa_imagens (job_id, arquivo, parte, total_partes, dados)
+           VALUES (?, ?, ?, ?, ?)`,
+          [jobId, arquivo, parte, totalPartes, String(body.dadosB64)],
         );
-        return json({ ok: true });
+
+        const contagem = await env.DB.query(
+          `SELECT COUNT(*) AS n FROM rpa_imagens WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+        );
+        const completa = Number(contagem.rows[0].n) === totalPartes;
+        if (completa) {
+          await env.DB.exec(
+            `UPDATE rpa_estampas SET enviada = 1 WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+          );
+        }
+        return json({ ok: true, completa });
       }
 
-      // Passo 3: monta o config.json e chama o robô.
+      // Passo 3: avisa o robô. Nenhum arquivo sai daqui -- ele vem buscar.
       if (pathname === '/api/rpa/lote/disparar' && request.method === 'POST') {
         await ensureRpaTables(env);
         const body = (await request.json()) as { job_id?: string };
@@ -1199,16 +1206,48 @@ export default {
         }
 
         const est = await env.DB.query(
-          `SELECT ordem, identifier, arquivo, categoria, material, grupos, rapport,
-                  nome_fonte, tamanho_fonte, cor_fonte, enviada
-             FROM rpa_estampas WHERE job_id = ? ORDER BY ordem`, [jobId],
+          `SELECT identifier, enviada FROM rpa_estampas WHERE job_id = ? ORDER BY ordem`, [jobId],
         );
         const faltando = est.rows.filter((r) => !Number(r.enviada)).map((r) => String(r.identifier));
         if (faltando.length) {
           return json({ error: `faltou subir a imagem de: ${faltando.join(', ')}` }, 400);
         }
 
-        const config = {
+        const runUrl = await rpaGhDispatch(env, jobId);
+
+        await env.DB.exec(
+          `UPDATE rpa_jobs SET status = 'na_fila', run_url = ? WHERE job_id = ?`, [runUrl, jobId],
+        );
+        await env.DB.exec(
+          `INSERT INTO rpa_eventos (job_id, identifier, status, message)
+           VALUES (?, '', 'info', 'Lote enviado pro robô. Aguardando ele iniciar (costuma levar 1 a 2 minutos).')`,
+          [jobId],
+        );
+        return json({ ok: true, run_url: runUrl });
+      }
+
+      // ---- As 2 rotas que o robô usa pra buscar o lote (exigem o token) ----
+
+      // A receita do lote: o que cadastrar e com quais opções.
+      if (pathname === '/api/rpa/job') {
+        if (!env.RPA_TOKEN || request.headers.get('x-rpa-token') !== env.RPA_TOKEN) {
+          return json({ error: 'não autorizado' }, 401);
+        }
+        await ensureRpaTables(env);
+        const jobId = url.searchParams.get('job');
+        if (!jobId) return json({ error: 'job obrigatório' }, 400);
+
+        const jobRes = await env.DB.query(
+          `SELECT element_type FROM rpa_jobs WHERE job_id = ?`, [jobId],
+        );
+        if (!jobRes.rows.length) return json({ error: 'lote não encontrado' }, 404);
+
+        const est = await env.DB.query(
+          `SELECT identifier, arquivo, categoria, material, grupos, rapport,
+                  nome_fonte, tamanho_fonte, cor_fonte
+             FROM rpa_estampas WHERE job_id = ? ORDER BY ordem`, [jobId],
+        );
+        return json({
           job_id: jobId,
           element_type: String(jobRes.rows[0].element_type || 'Imagem (Sua foto)'),
           estampas: est.rows.map((r) => ({
@@ -1222,21 +1261,24 @@ export default {
             tamanho_fonte: String(r.tamanho_fonte || ''),
             cor_fonte: String(r.cor_fonte || ''),
           })),
-        };
+        });
+      }
 
-        const configB64 = rpaTextoParaB64(JSON.stringify(config, null, 2));
-        await rpaGhPutFile(env, `jobs/${jobId}/config.json`, configB64, `job ${jobId}: config`);
-        const runUrl = await rpaGhDispatch(env, jobId);
+      // Os bytes de um PNG do lote.
+      if (pathname === '/api/rpa/imagem') {
+        if (!env.RPA_TOKEN || request.headers.get('x-rpa-token') !== env.RPA_TOKEN) {
+          return new Response('não autorizado', { status: 401 });
+        }
+        await ensureRpaTables(env);
+        const jobId = url.searchParams.get('job');
+        const arquivo = url.searchParams.get('arquivo');
+        if (!jobId || !arquivo) return new Response('job e arquivo obrigatórios', { status: 400 });
 
-        await env.DB.exec(
-          `UPDATE rpa_jobs SET status = 'na_fila', run_url = ? WHERE job_id = ?`, [runUrl, jobId],
-        );
-        await env.DB.exec(
-          `INSERT INTO rpa_eventos (job_id, identifier, status, message)
-           VALUES (?, '', 'info', 'Lote enviado pro robô. Aguardando ele iniciar (costuma levar 1 a 2 minutos).')`,
-          [jobId],
-        );
-        return json({ ok: true, run_url: runUrl });
+        const bytes = await rpaMontarImagem(env, jobId, arquivo);
+        if (!bytes) return new Response('imagem incompleta ou inexistente', { status: 404 });
+        return new Response(bytes, {
+          headers: { 'content-type': 'image/png', 'cache-control': 'no-store' },
+        });
       }
 
       // O robô reportando progresso. Só ele entra aqui (segredo compartilhado).
@@ -1270,6 +1312,8 @@ export default {
           `UPDATE rpa_jobs SET status = ?, erro = ?, finished_at = datetime('now') WHERE job_id = ?`,
           [body.erro ? 'erro' : 'concluido', body.erro ? String(body.erro) : null, jobId],
         );
+        // As imagens já cumpriram o papel -- não ficam ocupando o banco.
+        await env.DB.exec(`DELETE FROM rpa_imagens WHERE job_id = ?`, [jobId]);
         return json({ ok: true });
       }
 

@@ -4018,6 +4018,27 @@
     });
   }
 
+  // Uma estampa passa fácil de 5MB, então o PNG sobe em pedaços (~384KB de
+  // base64 cada). O servidor remonta quando o último pedaço chega.
+  const RPA_PEDACO = 384 * 1024;
+
+  async function rpaSubirImagem(jobId, arquivo, file, onProgresso) {
+    const dataUrl = await rpaLerArquivo(file);
+    const b64 = String(dataUrl).split(',')[1] || '';
+    if (!b64) throw new Error('não consegui ler ' + file.name);
+    const total = Math.max(1, Math.ceil(b64.length / RPA_PEDACO));
+    for (let parte = 0; parte < total; parte++) {
+      await rpaPost('/api/rpa/lote/imagem', {
+        job_id: jobId,
+        arquivo,
+        parte,
+        total_partes: total,
+        dadosB64: b64.slice(parte * RPA_PEDACO, (parte + 1) * RPA_PEDACO),
+      });
+      if (onProgresso) onProgresso(parte + 1, total);
+    }
+  }
+
   async function rpaPost(rota, corpo) {
     const r = await fetch(rota, {
       method: 'POST',
@@ -4053,9 +4074,10 @@
       });
 
       for (let i = 0; i < rpaArquivos.length; i++) {
-        msg.textContent = `Enviando imagem ${i + 1} de ${rpaArquivos.length}…`;
-        const dataUrl = await rpaLerArquivo(rpaArquivos[i].file);
-        await rpaPost('/api/rpa/lote/imagem', { job_id, arquivo: arquivos[i].arquivo, dataUrl });
+        await rpaSubirImagem(job_id, arquivos[i].arquivo, rpaArquivos[i].file, (feito, total) => {
+          const pct = total > 1 ? ` (${Math.round((feito / total) * 100)}%)` : '';
+          msg.textContent = `Enviando imagem ${i + 1} de ${rpaArquivos.length}${pct}…`;
+        });
       }
 
       msg.textContent = 'Acionando o robô…';
