@@ -14,6 +14,23 @@
   var savedStageBg = null;
   try { savedStageBg = localStorage.getItem(STAGE_KEY); } catch (err) {}
   root.setAttribute('data-stage-bg', savedStageBg || 'checker');
+  var NAV_KEY = 'gda-sidenav';
+  var savedNav = null;
+  try { savedNav = localStorage.getItem(NAV_KEY); } catch (err) {}
+  function applyNav(state) {
+    root.setAttribute('data-sidenav', state);
+    var btn = document.getElementById('sidenavToggle');
+    if (btn) {
+      var expanded = state !== 'collapsed';
+      btn.setAttribute('aria-expanded', String(expanded));
+      btn.setAttribute('title', expanded ? 'Ocultar menu lateral' : 'Mostrar menu lateral');
+      btn.setAttribute('aria-label', expanded ? 'Ocultar menu lateral' : 'Mostrar menu lateral');
+    }
+  }
+  applyNav(savedNav || 'expanded');
+  // O botão ainda não existe nesse ponto (script roda no <head>, antes do <body> ser
+  // parseado) — reaplica só pra sincronizar aria-expanded/title dele assim que existir.
+  document.addEventListener('DOMContentLoaded', function () { applyNav(root.getAttribute('data-sidenav')); });
   document.addEventListener('click', function (ev) {
     var btn = ev.target.closest && ev.target.closest('#themeToggle');
     if (btn) {
@@ -27,6 +44,13 @@
       var v = swatch.getAttribute('data-bg');
       root.setAttribute('data-stage-bg', v);
       try { localStorage.setItem(STAGE_KEY, v); } catch (err) {}
+      return;
+    }
+    var navBtn = ev.target.closest && ev.target.closest('#sidenavToggle');
+    if (navBtn) {
+      var next = root.getAttribute('data-sidenav') === 'collapsed' ? 'expanded' : 'collapsed';
+      applyNav(next);
+      try { localStorage.setItem(NAV_KEY, next); } catch (err) {}
     }
   });
 })();</script>
@@ -455,9 +479,29 @@
   .topbar-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; }
 
   /* ---- Menu lateral (esquerda) ---- */
-  .shell { display: flex; align-items: flex-start; gap: 0; }
+  .shell { display: flex; align-items: flex-start; gap: 0; position: relative; }
   .sidenav { flex: none; width: 218px; padding: 1.5rem .75rem 2rem 1.25rem; display: flex; flex-direction: column; gap: 1.4rem;
     position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; }
+  /* Botão-aba pra recolher/mostrar o menu lateral, "puxando" pela lateral. Fixo no viewport pra
+     não depender da largura variável do .sidenav quando ele encolhe; some em telas pequenas
+     (onde o menu já vira uma fileira horizontal, ver media query lá embaixo). */
+  @media (min-width: 901px) {
+    .sidenav { transition: width .2s ease, padding .2s ease, opacity .15s ease; }
+    .sidenavToggle { display: flex; position: fixed; top: 50%; left: 218px; transform: translate(-50%, -50%);
+      width: 22px; height: 52px; align-items: center; justify-content: center; padding: 0;
+      border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted);
+      cursor: pointer; z-index: 40; box-shadow: 0 1px 4px rgba(15,23,42,.12);
+      transition: left .2s ease, border-radius .2s ease, background-color .15s ease, border-color .15s ease, color .15s ease; }
+    .sidenavToggle:hover { color: var(--primary); border-color: var(--primary); }
+    .sidenavToggle svg { width: 13px; height: 13px; transition: transform .2s ease; }
+    :root[data-sidenav="collapsed"] .sidenav { width: 0; padding-left: 0; padding-right: 0; opacity: 0;
+      overflow: hidden; pointer-events: none; }
+    :root[data-sidenav="collapsed"] .sidenavToggle { left: 0; border-radius: 0 8px 8px 0; }
+    :root[data-sidenav="collapsed"] .sidenavToggle svg { transform: rotate(180deg); }
+  }
+  @media (max-width: 900px) {
+    .sidenavToggle { display: none; }
+  }
   .navGroup { display: flex; flex-direction: column; gap: 2px; }
   .navTitle { margin: 0 0 .45rem .55rem; font-size: .68rem; font-weight: 750; letter-spacing: .08em;
     text-transform: uppercase; color: var(--muted); }
@@ -576,7 +620,7 @@
 </header>
 
 <div class="shell">
-<aside class="sidenav" aria-label="Navegação principal">
+<aside class="sidenav" id="sidenav" aria-label="Navegação principal">
   <nav class="navGroup">
     <p class="navTitle">Ilustração</p>
     <button type="button" class="navItem active" data-view="psd">
@@ -611,6 +655,11 @@
     </button>
   </nav>
 </aside>
+
+<button type="button" id="sidenavToggle" class="sidenavToggle" aria-controls="sidenav"
+  aria-expanded="true" aria-label="Ocultar menu lateral" title="Ocultar menu lateral">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+</button>
 
 <div class="page">
   <div id="view-soon" class="hidden">
@@ -2670,9 +2719,11 @@
   let fontesCarregadas = false;
   const fontesUsadas = new Map();   // url -> family já registrada no document.fonts
 
+  // Busca a lista de fontes ao vivo no Catalog toda vez que é chamada (sem cache local) — assim
+  // uma fonte cadastrada agora no Catalog já aparece na próxima vez que a barra "Adicionar Fonte"
+  // for aberta, sem precisar recarregar a página nem esperar redeploy.
   async function loadFontes() {
-    if (fontesCarregadas) return FONTES;
-    const r = await fetch('/api/fontes');
+    const r = await fetch('/api/fontes', { cache: 'no-store' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || 'falha ao carregar fontes');
     FONTES.length = 0;

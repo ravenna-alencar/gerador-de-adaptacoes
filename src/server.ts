@@ -965,7 +965,9 @@ export default {
       // {"id":"font/1/file/<hash>.ttf","storage":"store",...}. O arquivo em si é servido
       // publicamente pelo host do engine de customização (mesma base que o Prisma usa no site,
       // descoberta no bundle do engine), com CORS liberado — então o navegador carrega a fonte
-      // direto, sem proxy. Cache de 1h: a lista quase não muda e são ~3k linhas.
+      // direto, sem proxy. Sem cache: consulta o Catalog ao vivo a cada chamada, pra fonte nova
+      // cadastrada lá aparecer aqui na hora (o front também busca de novo toda vez que a barra
+      // "Adicionar Fonte" é aberta — ver loadFontes() no index.html).
       if (pathname === '/api/fontes') {
         if (!env.METABASE_TOKEN) return json({ error: 'METABASE_TOKEN não configurado' }, 500);
         const rows = await metabaseQuery(
@@ -979,7 +981,7 @@ export default {
           try { caminho = String((JSON.parse(String(r.file_data)) as { id?: string }).id || ''); } catch { /* linha com JSON inválido — ignorada abaixo */ }
           return { id: Number(r.id), nome: String(r.name || ''), url: caminho ? BASE + caminho : '' };
         }).filter((f) => f.url && /\.(ttf|otf|woff2?)$/i.test(f.url));
-        return json({ fontes }, 200, { 'cache-control': 'public, max-age=3600' });
+        return json({ fontes }, 200, { 'cache-control': 'no-store' });
       }
 
       // ---- Alocação de um item existente numa tag (aba "Adaptar ID") ----
