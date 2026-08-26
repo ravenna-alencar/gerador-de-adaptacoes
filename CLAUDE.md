@@ -34,6 +34,12 @@ evita TDZ (a chamada fica antes das `let` da seção PSD no arquivo). Estampas c
 4. **Adaptar imagem** — ferramenta genérica: envia uma imagem, escolhe tamanhos (todas as
    máscaras dos produtos, via `/api/produtos`) e gera com IA. Aplica as regras de composição do segmento.
 
+No menu **Cadastro** há também a aba real **Cadastrar no Catalog** (`data-view="rpa"`,
+`#view-rpa`): monta um lote de estampas (PNG + identifier + categoria + grupos) e aciona o
+**robô Playwright que roda no GitHub Actions** — aqui dentro não existe navegador. A tela só
+manda o pedido e acompanha por polling; quem clica no Catalog é o robô, com a conta `rpa_ia`.
+Ver a seção de endpoints `/api/rpa/*` e `SETUP-NUVEM.md` no repositório do robô.
+
 O **painel Adaptar** (compartilhado) busca a arte de referência automaticamente, gera **uma
 versão por máscara/volumetria** do produto e mostra, por resultado: **Baixar PNG · Remover fundo
 · Gerar nova versão**. Remoção de fundo é **pós-visualização** (só chama o remove.bg quando clica).
@@ -204,6 +210,18 @@ O app NÃO tem dados próprios de catálogo; consulta bancos externos:
 - `GET /img?job=<id>&nobg=1` — serve a imagem gerada (proxy dos bytes; `nobg=1` aplica remove.bg).
 - `POST /api/prepare {imageBase64}` — (aba Adaptar imagem) sobe a imagem enviada como referência (PiApp upload_reference) + descreve via visão.
 
+### RPA — cadastro no Catalog v3 (menu Cadastro → "Cadastrar no Catalog")
+
+- `GET  /api/rpa/config` — grupos de adaptação e materiais base por categoria + `configurado` (se os segredos do GitHub existem).
+- `POST /api/rpa/lote` — cria o lote (só metadados) → `{job_id, arquivos}`. Valida identifier (`^[a-z0-9][a-z0-9-]{1,80}$`), duplicata e categoria; máx. 50 estampas.
+- `POST /api/rpa/lote/imagem {job_id, arquivo, dataUrl}` — **um PNG por chamada** (evita estourar o tamanho de requisição); grava em `jobs/<job_id>/` no branch `jobs` do repo do robô. Máx. 25MB, só PNG.
+- `POST /api/rpa/lote/disparar {job_id}` — monta o `config.json` a partir do banco e chama o `workflow_dispatch`.
+- `POST /api/rpa/progresso` / `POST /api/rpa/finalizar` — **o robô** reportando (exige header `x-rpa-token` = segredo `RPA_TOKEN`).
+- `GET  /api/rpa/status?job=&desde=` — polling da tela (2,5s), devolve o job + eventos novos desde o id `desde`.
+- `GET  /api/rpa/lotes` — histórico (últimos 20) de quem está olhando.
+
+Tabelas próprias em `env.DB`: `rpa_jobs`, `rpa_estampas`, `rpa_eventos` (criadas por `ensureRpaTables`).
+
 ---
 
 ## Secrets (setAppSecret) — nunca no código
@@ -213,6 +231,12 @@ O app NÃO tem dados próprios de catálogo; consulta bancos externos:
 - `REMOVEBG_KEY` — remove.bg (**plano free = saída 0.25MP**; upgrade pago = alta resolução).
 - `METABASE_TOKEN` — API key do Metabase (`mb_...`) p/ consultar o Catalog (db 19).
 - `PROXY_BASE_URL` — injetado pelo GoDeploy (proxy de dados do Site).
+- `GITHUB_TOKEN` + `GITHUB_REPO` — acionam o robô de cadastro (repo privado `rpaiagogroup/catalog-estampas-rpa`). Sem eles a aba "Cadastrar no Catalog" aparece com aviso e botão desabilitado; o resto do app não muda.
+- `RPA_TOKEN` — senha combinada com o robô; sem ela `/api/rpa/progresso` e `/api/rpa/finalizar` respondem 401.
+- Opcionais: `GITHUB_REF` (default `main`), `GITHUB_JOBS_BRANCH` (default `jobs`), `GITHUB_WORKFLOW` (default `cadastrar-estampas.yml`).
+
+> **A sessão do Catalog nunca passa por este app.** Ela é segredo do GitHub (`CATALOG_AUTH_STATE`),
+> lida só dentro do Actions. Setup completo em `SETUP-NUVEM.md`, no repositório do robô.
 
 ---
 

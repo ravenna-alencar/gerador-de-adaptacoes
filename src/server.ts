@@ -45,6 +45,13 @@ interface Env {
   METABASE_URL?: string;
   GOOGLE_CLIENT_EMAIL?: string; // conta de serviço p/ gravar o registro na planilha dedicada
   GOOGLE_PRIVATE_KEY?: string;
+  // ---- RPA de cadastro no Catalog v3 (aba "Cadastrar estampas") ----
+  GITHUB_TOKEN?: string;        // token com acesso ao repo do robô (Actions + conteúdo)
+  GITHUB_REPO?: string;         // "owner/repo" do robô
+  GITHUB_REF?: string;          // branch do código (default: main)
+  GITHUB_JOBS_BRANCH?: string;  // branch onde os arquivos do lote ficam (default: jobs)
+  GITHUB_WORKFLOW?: string;     // arquivo do workflow (default: cadastrar-estampas.yml)
+  RPA_TOKEN?: string;           // segredo compartilhado: só o robô pode reportar progresso
   DB: Db;
 }
 
@@ -883,11 +890,452 @@ function prettyIdentifier(id: string): string {
     .split('-').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
+/* ===================================================================
+   RPA — cadastro em lote de estampas no Catalog v3
+   ===================================================================
+   A tela aqui só monta o pedido; quem clica no Catalog é o robô Playwright,
+   que roda no GitHub Actions (aqui dentro não existe navegador). O caminho:
+
+     tela  ->  POST /api/rpa/lote            cria o lote (metadados)
+           ->  POST /api/rpa/lote/imagem     um PNG por chamada, vai pro GitHub
+           ->  POST /api/rpa/lote/disparar   grava o config.json e chama o Actions
+     robô  ->  POST /api/rpa/progresso       cada passo que ele dá
+           ->  POST /api/rpa/finalizar       fim do lote
+     tela  ->  GET  /api/rpa/status?job=     pergunta de 2 em 2s e mostra ao vivo
+
+   Os PNGs moram no branch "jobs" do repositório do robô (o Actions já baixa
+   o repositório de qualquer jeito, então não precisa de storage novo) e são
+   apagados pelo próprio workflow no fim, dê certo ou dê errado.
+
+   A sessão do Catalog NÃO passa por aqui: ela é um segredo do GitHub, usada
+   só dentro do Actions. Este worker nunca vê credencial do Catalog.
+*/
+
+const RPA_MATERIAL_CASE = 'standard-iphone11';
+
+const RPA_GRUPOS_POR_CATEGORIA: Record<string, string[]> = {
+  case: ['Top Camera', '2/5-Center', '1/3-Left-Thin', '1/3-Left-Large', '1/3-Left-Center', '1/3-Center'],
+  termico: [
+    'Fresh 1200 - CLARO', 'Fresh 1200 - ESCURO', 'Fresh 350ml - Claro', 'Fresh 350ml - Escuro',
+    'Fresh v2 650ml', 'Fresh v2 650ml - Escuro', 'Fresh v2 950ml', 'Fresh v2 950ml - Escuro',
+    'Copo Vibe - Branco', 'Copo Vibe - Preto', 'Copo Life 880ml - Claro', 'Copo Life 880ml - Escuro',
+    'Copo Life - Claro', 'Copo Life - Escuro', 'Urban 500ml', 'Urban 500ml - Escuro',
+    'Garrafa Pro - 750ml - CLARO', 'Garrafa Pro - 750ml - ESCURO',
+  ],
+  textil: [], // ainda sem lista confirmada
+};
+
+const RPA_MATERIAIS_POR_CATEGORIA: Record<string, { label: string; value: string }[]> = {
+  termico: [
+    { label: 'Fresh 950ml - Claro', value: '360freshbrancav3-garrafafresh950' },
+    { label: 'Fresh 950ml - Escuro', value: '360freshpretav3-garrafafresh950' },
+    { label: 'Fresh 650ml - Claro', value: '360freshbrancav3-garrafafresh650' },
+    { label: 'Fresh 650ml - Escuro', value: '360freshpretav3-garrafafresh650' },
+    { label: 'Vibe 470ml - Claro', value: '360vibebranco-copovibe470' },
+    { label: 'Vibe 470ml - Escuro', value: '360vibepreto-copovibe470' },
+    { label: 'Life 880ml - Claro', value: '360lifebranco-copolife880' },
+    { label: 'Life 880ml - Escuro', value: '360lifepreto-copolife880' },
+    { label: 'Life 1180ml - Claro', value: '360lifebranco-copolife1180' },
+    { label: 'Life 1180ml - Escuro', value: '360lifepreto-copolife1180' },
+    { label: 'Urban 500ml - Claro', value: '360urbanbranca-garrafaurban500' },
+    { label: 'Urban 500ml - Escuro', value: '360urbanpreta-garrafaurban500' },
+    { label: 'Flip Pro - Claro', value: '360flipprobranco-360flippro' },
+    { label: 'Flip Pro - Escuro', value: '360flippropreto-360flippro' },
+  ],
+  textil: [],
+};
+
+const RPA_STATUS_ABERTOS = ['montando', 'na_fila', 'rodando'];
+
+async function ensureRpaTables(env: Env): Promise<void> {
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS rpa_jobs (
+      job_id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      user_email TEXT,
+      status TEXT NOT NULL,
+      total INTEGER NOT NULL DEFAULT 0,
+      element_type TEXT,
+      erro TEXT,
+      finished_at TEXT,
+      run_url TEXT
+    )`,
+    [],
+  );
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS rpa_estampas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      ordem INTEGER NOT NULL,
+      identifier TEXT NOT NULL,
+      arquivo TEXT NOT NULL,
+      categoria TEXT NOT NULL,
+      material TEXT,
+      grupos TEXT,
+      rapport INTEGER NOT NULL DEFAULT 0,
+      nome_fonte TEXT,
+      tamanho_fonte TEXT,
+      cor_fonte TEXT,
+      enviada INTEGER NOT NULL DEFAULT 0
+    )`,
+    [],
+  );
+  await env.DB.exec(`CREATE INDEX IF NOT EXISTS rpa_estampas_job ON rpa_estampas (job_id, ordem)`, []);
+  await env.DB.exec(
+    `CREATE TABLE IF NOT EXISTS rpa_eventos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      at TEXT NOT NULL DEFAULT (datetime('now')),
+      identifier TEXT,
+      status TEXT,
+      message TEXT
+    )`,
+    [],
+  );
+  await env.DB.exec(`CREATE INDEX IF NOT EXISTS rpa_eventos_job ON rpa_eventos (job_id, id)`, []);
+}
+
+function rpaGhHeaders(env: Env): Record<string, string> {
+  return {
+    authorization: `Bearer ${env.GITHUB_TOKEN}`,
+    accept: 'application/vnd.github+json',
+    'x-github-api-version': '2022-11-28',
+    'user-agent': 'gerador-de-adaptacoes-rpa',
+    'content-type': 'application/json',
+  };
+}
+
+function rpaGhConfig(env: Env) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+    throw new Error('O robô não está configurado: faltam os segredos GITHUB_TOKEN e/ou GITHUB_REPO.');
+  }
+  return {
+    repo: env.GITHUB_REPO,
+    ref: env.GITHUB_REF || 'main',
+    branch: env.GITHUB_JOBS_BRANCH || 'jobs',
+    workflow: env.GITHUB_WORKFLOW || 'cadastrar-estampas.yml',
+  };
+}
+
+/** Garante que o branch dos arquivos de lote existe (na primeira vez ele não existe). */
+async function rpaGhEnsureBranch(env: Env): Promise<void> {
+  const { repo, ref, branch } = rpaGhConfig(env);
+  const existe = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${branch}`, {
+    headers: rpaGhHeaders(env),
+  });
+  if (existe.ok) return;
+
+  const base = await fetch(`https://api.github.com/repos/${repo}/git/ref/heads/${ref}`, {
+    headers: rpaGhHeaders(env),
+  });
+  if (!base.ok) throw new Error(`Não achei o branch "${ref}" no repositório do robô (${base.status}).`);
+  const sha = ((await base.json()) as { object: { sha: string } }).object.sha;
+
+  const criado = await fetch(`https://api.github.com/repos/${repo}/git/refs`, {
+    method: 'POST',
+    headers: rpaGhHeaders(env),
+    body: JSON.stringify({ ref: `refs/heads/${branch}`, sha }),
+  });
+  // 422 = alguém criou entre a checagem e agora; não é erro pra gente.
+  if (!criado.ok && criado.status !== 422) {
+    throw new Error(`Não consegui criar o branch "${branch}": ${criado.status} ${await criado.text()}`);
+  }
+}
+
+/** Grava (ou substitui) um arquivo no branch dos lotes. `conteudoB64` é base64 puro. */
+async function rpaGhPutFile(env: Env, caminho: string, conteudoB64: string, mensagem: string): Promise<void> {
+  const { repo, branch } = rpaGhConfig(env);
+  const url = `https://api.github.com/repos/${repo}/contents/${caminho}`;
+
+  // Se o arquivo já existe, o GitHub exige o sha do anterior pra substituir.
+  let sha: string | undefined;
+  const atual = await fetch(`${url}?ref=${branch}`, { headers: rpaGhHeaders(env) });
+  if (atual.ok) sha = ((await atual.json()) as { sha?: string }).sha;
+
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: rpaGhHeaders(env),
+    body: JSON.stringify({ message: mensagem, content: conteudoB64, branch, ...(sha ? { sha } : {}) }),
+  });
+  if (!r.ok) throw new Error(`O GitHub recusou o arquivo ${caminho}: ${r.status} ${await r.text()}`);
+}
+
+async function rpaGhDispatch(env: Env, jobId: string): Promise<string> {
+  const { repo, ref, workflow } = rpaGhConfig(env);
+  const r = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${workflow}/dispatches`, {
+    method: 'POST',
+    headers: rpaGhHeaders(env),
+    body: JSON.stringify({ ref, inputs: { job_id: jobId } }),
+  });
+  if (!r.ok) throw new Error(`Não consegui acionar o robô no GitHub: ${r.status} ${await r.text()}`);
+  return `https://github.com/${repo}/actions/workflows/${workflow}`;
+}
+
+const RPA_ID_VALIDO = /^[a-z0-9][a-z0-9-]{1,80}$/;
+
+/** Texto (com acento) -> base64, do jeito que o GitHub espera. Sem `unescape`,
+ *  que é global legado e não dá pra contar com ele no worker. */
+function rpaTextoParaB64(texto: string): string {
+  const bytes = new TextEncoder().encode(texto);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
     try {
+      // ==================== RPA — cadastro no Catalog v3 ====================
+
+      // Listas que a tela usa pra montar os seletores (mesma fonte do robô).
+      if (pathname === '/api/rpa/config') {
+        return json({
+          gruposPorCategoria: RPA_GRUPOS_POR_CATEGORIA,
+          materiaisPorCategoria: RPA_MATERIAIS_POR_CATEGORIA,
+          materialCasePadrao: RPA_MATERIAL_CASE,
+          configurado: !!(env.GITHUB_TOKEN && env.GITHUB_REPO),
+        });
+      }
+
+      // Passo 1: cria o lote (só metadados -- as imagens vêm nas chamadas seguintes).
+      if (pathname === '/api/rpa/lote' && request.method === 'POST') {
+        await ensureRpaTables(env);
+        rpaGhConfig(env); // falha cedo e com mensagem clara se faltar segredo
+        const body = (await request.json()) as {
+          element_type?: string;
+          estampas?: {
+            identifier?: string; categoria?: string; material?: string; grupos?: string[];
+            rapport?: boolean; nome_fonte?: string; tamanho_fonte?: string; cor_fonte?: string;
+          }[];
+        };
+        const lista = Array.isArray(body.estampas) ? body.estampas : [];
+        if (!lista.length) return json({ error: 'nenhuma estampa no lote' }, 400);
+        if (lista.length > 50) return json({ error: 'máximo de 50 estampas por lote' }, 400);
+
+        const vistos = new Set<string>();
+        for (const e of lista) {
+          const id = String(e.identifier || '').trim().toLowerCase();
+          if (!RPA_ID_VALIDO.test(id)) {
+            return json({ error: `identifier inválido: "${e.identifier}" (só minúsculas, números e hífen)` }, 400);
+          }
+          if (vistos.has(id)) return json({ error: `identifier repetido no lote: "${id}"` }, 400);
+          vistos.add(id);
+          const cat = String(e.categoria || 'case');
+          if (!(cat in RPA_GRUPOS_POR_CATEGORIA)) return json({ error: `categoria desconhecida: "${cat}"` }, 400);
+        }
+
+        const jobId = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+        const userEmail = request.headers.get('x-godeploy-user-email') || null;
+        await env.DB.exec(
+          `INSERT INTO rpa_jobs (job_id, user_email, status, total, element_type)
+           VALUES (?, ?, 'montando', ?, ?)`,
+          [jobId, userEmail, lista.length, String(body.element_type || 'Imagem (Sua foto)')],
+        );
+
+        const arquivos: { ordem: number; identifier: string; arquivo: string }[] = [];
+        for (let i = 0; i < lista.length; i++) {
+          const e = lista[i];
+          const identifier = String(e.identifier || '').trim().toLowerCase();
+          const categoria = String(e.categoria || 'case');
+          const arquivo = `${String(i).padStart(2, '0')}_${identifier}.png`;
+          const material = categoria === 'case' ? RPA_MATERIAL_CASE : String(e.material || '');
+          await env.DB.exec(
+            `INSERT INTO rpa_estampas
+               (job_id, ordem, identifier, arquivo, categoria, material, grupos, rapport, nome_fonte, tamanho_fonte, cor_fonte)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              jobId, i, identifier, arquivo, categoria, material,
+              JSON.stringify(Array.isArray(e.grupos) ? e.grupos : []),
+              e.rapport ? 1 : 0,
+              String(e.nome_fonte || ''), String(e.tamanho_fonte || ''), String(e.cor_fonte || ''),
+            ],
+          );
+          arquivos.push({ ordem: i, identifier, arquivo });
+        }
+        return json({ job_id: jobId, arquivos });
+      }
+
+      // Passo 2: uma imagem por chamada (evita estourar o tamanho de requisição).
+      if (pathname === '/api/rpa/lote/imagem' && request.method === 'POST') {
+        await ensureRpaTables(env);
+        const body = (await request.json()) as { job_id?: string; arquivo?: string; dataUrl?: string };
+        const jobId = String(body.job_id || '');
+        const arquivo = String(body.arquivo || '');
+        if (!jobId || !arquivo || !body.dataUrl) return json({ error: 'job_id, arquivo e dataUrl obrigatórios' }, 400);
+
+        const dono = await env.DB.query(
+          `SELECT job_id FROM rpa_estampas WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+        );
+        if (!dono.rows.length) return json({ error: 'arquivo não faz parte deste lote' }, 404);
+
+        const { bytes, mime } = decodeDataUrl(String(body.dataUrl));
+        if (mime !== 'image/png') return json({ error: `a estampa precisa ser PNG (recebi ${mime})` }, 400);
+        if (bytes.length > 25 * 1024 * 1024) return json({ error: 'imagem acima de 25MB' }, 400);
+
+        await rpaGhEnsureBranch(env);
+        const b64 = String(body.dataUrl).split(',')[1];
+        await rpaGhPutFile(env, `jobs/${jobId}/${arquivo}`, b64, `job ${jobId}: ${arquivo}`);
+        await env.DB.exec(
+          `UPDATE rpa_estampas SET enviada = 1 WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
+        );
+        return json({ ok: true });
+      }
+
+      // Passo 3: monta o config.json e chama o robô.
+      if (pathname === '/api/rpa/lote/disparar' && request.method === 'POST') {
+        await ensureRpaTables(env);
+        const body = (await request.json()) as { job_id?: string };
+        const jobId = String(body.job_id || '');
+        if (!jobId) return json({ error: 'job_id obrigatório' }, 400);
+
+        const jobRes = await env.DB.query(
+          `SELECT status, element_type FROM rpa_jobs WHERE job_id = ?`, [jobId],
+        );
+        if (!jobRes.rows.length) return json({ error: 'lote não encontrado' }, 404);
+        if (String(jobRes.rows[0].status) !== 'montando') {
+          return json({ error: 'este lote já foi disparado' }, 409);
+        }
+
+        const est = await env.DB.query(
+          `SELECT ordem, identifier, arquivo, categoria, material, grupos, rapport,
+                  nome_fonte, tamanho_fonte, cor_fonte, enviada
+             FROM rpa_estampas WHERE job_id = ? ORDER BY ordem`, [jobId],
+        );
+        const faltando = est.rows.filter((r) => !Number(r.enviada)).map((r) => String(r.identifier));
+        if (faltando.length) {
+          return json({ error: `faltou subir a imagem de: ${faltando.join(', ')}` }, 400);
+        }
+
+        const config = {
+          job_id: jobId,
+          element_type: String(jobRes.rows[0].element_type || 'Imagem (Sua foto)'),
+          estampas: est.rows.map((r) => ({
+            identifier: String(r.identifier),
+            arquivo: String(r.arquivo),
+            categoria: String(r.categoria),
+            material: String(r.material || ''),
+            grupos: JSON.parse(String(r.grupos || '[]')),
+            rapport: !!Number(r.rapport),
+            nome_fonte: String(r.nome_fonte || ''),
+            tamanho_fonte: String(r.tamanho_fonte || ''),
+            cor_fonte: String(r.cor_fonte || ''),
+          })),
+        };
+
+        const configB64 = rpaTextoParaB64(JSON.stringify(config, null, 2));
+        await rpaGhPutFile(env, `jobs/${jobId}/config.json`, configB64, `job ${jobId}: config`);
+        const runUrl = await rpaGhDispatch(env, jobId);
+
+        await env.DB.exec(
+          `UPDATE rpa_jobs SET status = 'na_fila', run_url = ? WHERE job_id = ?`, [runUrl, jobId],
+        );
+        await env.DB.exec(
+          `INSERT INTO rpa_eventos (job_id, identifier, status, message)
+           VALUES (?, '', 'info', 'Lote enviado pro robô. Aguardando ele iniciar (costuma levar 1 a 2 minutos).')`,
+          [jobId],
+        );
+        return json({ ok: true, run_url: runUrl });
+      }
+
+      // O robô reportando progresso. Só ele entra aqui (segredo compartilhado).
+      if (pathname === '/api/rpa/progresso' && request.method === 'POST') {
+        if (!env.RPA_TOKEN || request.headers.get('x-rpa-token') !== env.RPA_TOKEN) {
+          return json({ error: 'não autorizado' }, 401);
+        }
+        await ensureRpaTables(env);
+        const body = (await request.json()) as { job_id?: string; identifier?: string; status?: string; message?: string };
+        const jobId = String(body.job_id || '');
+        if (!jobId) return json({ error: 'job_id obrigatório' }, 400);
+        await env.DB.exec(
+          `INSERT INTO rpa_eventos (job_id, identifier, status, message) VALUES (?, ?, ?, ?)`,
+          [jobId, String(body.identifier || ''), String(body.status || 'info'), String(body.message || '')],
+        );
+        await env.DB.exec(
+          `UPDATE rpa_jobs SET status = 'rodando' WHERE job_id = ? AND status = 'na_fila'`, [jobId],
+        );
+        return json({ ok: true });
+      }
+
+      if (pathname === '/api/rpa/finalizar' && request.method === 'POST') {
+        if (!env.RPA_TOKEN || request.headers.get('x-rpa-token') !== env.RPA_TOKEN) {
+          return json({ error: 'não autorizado' }, 401);
+        }
+        await ensureRpaTables(env);
+        const body = (await request.json()) as { job_id?: string; erro?: string | null };
+        const jobId = String(body.job_id || '');
+        if (!jobId) return json({ error: 'job_id obrigatório' }, 400);
+        await env.DB.exec(
+          `UPDATE rpa_jobs SET status = ?, erro = ?, finished_at = datetime('now') WHERE job_id = ?`,
+          [body.erro ? 'erro' : 'concluido', body.erro ? String(body.erro) : null, jobId],
+        );
+        return json({ ok: true });
+      }
+
+      // A tela perguntando "e aí, como vai?" -- de 2 em 2 segundos.
+      if (pathname === '/api/rpa/status') {
+        await ensureRpaTables(env);
+        const jobId = url.searchParams.get('job');
+        if (!jobId) return json({ error: 'job obrigatório' }, 400);
+        const desde = Number(url.searchParams.get('desde') || 0);
+
+        const jobRes = await env.DB.query(
+          `SELECT job_id, status, total, erro, run_url, created_at, finished_at
+             FROM rpa_jobs WHERE job_id = ?`, [jobId],
+        );
+        if (!jobRes.rows.length) return json({ error: 'lote não encontrado' }, 404);
+        const j = jobRes.rows[0];
+
+        const ev = await env.DB.query(
+          `SELECT id, at, identifier, status, message FROM rpa_eventos
+             WHERE job_id = ? AND id > ? ORDER BY id LIMIT 500`, [jobId, desde],
+        );
+        return json({
+          job: {
+            jobId: String(j.job_id),
+            status: String(j.status),
+            total: Number(j.total),
+            erro: (j.erro as string | null) || null,
+            runUrl: (j.run_url as string | null) || null,
+            criadoEm: String(j.created_at || ''),
+            terminadoEm: (j.finished_at as string | null) || null,
+            aberto: RPA_STATUS_ABERTOS.includes(String(j.status)),
+          },
+          eventos: ev.rows.map((r) => ({
+            id: Number(r.id),
+            at: String(r.at || ''),
+            identifier: String(r.identifier || ''),
+            status: String(r.status || 'info'),
+            message: String(r.message || ''),
+          })),
+        });
+      }
+
+      // Histórico -- os últimos lotes de quem está olhando a tela.
+      if (pathname === '/api/rpa/lotes') {
+        await ensureRpaTables(env);
+        const userEmail = request.headers.get('x-godeploy-user-email') || null;
+        const r = await env.DB.query(
+          `SELECT job_id, created_at, status, total, erro, run_url, user_email
+             FROM rpa_jobs
+            WHERE (? IS NULL OR user_email = ?)
+            ORDER BY created_at DESC LIMIT 20`,
+          [userEmail, userEmail],
+        );
+        return json({
+          lotes: r.rows.map((row) => ({
+            jobId: String(row.job_id),
+            criadoEm: String(row.created_at || ''),
+            status: String(row.status),
+            total: Number(row.total),
+            erro: (row.erro as string | null) || null,
+            runUrl: (row.run_url as string | null) || null,
+            criadoPor: displayNameFromEmail(row.user_email as string | null),
+          })),
+        });
+      }
+
       // Lista o registro de produtos (para o cliente montar o checklist).
       if (pathname === '/api/estampas/produtos') {
         return json({ produtos: PRODUTOS });

@@ -589,6 +589,20 @@
   @media (max-width: 560px) {
     .stageBgPicker { display: none; }
   }
+/* ---- Cadastrar no Catalog (robô) ---- */
+.rpaGrupos{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.35rem .8rem;max-height:230px;overflow:auto;padding:.5rem .6rem;border:1px solid var(--bd,#2a3242);border-radius:8px}
+.rpaCheck{display:flex;align-items:center;gap:.45rem;font-size:.86rem;cursor:pointer}
+.rpaCheck input{margin:0;flex:none}
+.rpaLinha{display:flex;align-items:center;gap:.5rem}
+.rpaLinha .amInput{flex:1;min-width:0}
+.rpaLinha .rpaArq{font-size:.75rem;opacity:.6;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rpaRemover{background:none;border:0;color:#ef4444;cursor:pointer;font-size:1rem;line-height:1;padding:.2rem .35rem}
+.rpaLog{max-height:340px;overflow:auto;font-size:.82rem;line-height:1.5;border:1px solid var(--bd,#2a3242);border-radius:8px;padding:.6rem .7rem}
+.rpaLog .l{display:flex;gap:.5rem;padding:.1rem 0}
+.rpaLog .l b{flex:none;min-width:150px;opacity:.75;font-weight:600}
+.rpaLog .l.success{color:#22c55e}
+.rpaLog .l.error{color:#ef4444}
+.rpaLog .vazio{opacity:.6}
 </style>
 
 <header class="topbar">
@@ -641,6 +655,9 @@
   </nav>
   <nav class="navGroup">
     <p class="navTitle">Cadastro</p>
+    <button type="button" class="navItem" data-view="rpa">
+      <span class="navIco" aria-hidden="true">🤖</span><span class="navLabel">Cadastrar no Catalog</span>
+    </button>
     <button type="button" class="navItem" data-view="cad-geral" data-soon="1">
       <span class="navIco" aria-hidden="true">📊</span><span class="navLabel">Visão Geral</span><span class="navSoon" title="Em construção">🚧</span>
     </button>
@@ -725,6 +742,90 @@
     <div class="card">
       <h2>Copys cadastrados</h2>
       <ul class="tagList" id="copyList"><li class="tagEmpty">Carregando…</li></ul>
+    </div>
+  </div>
+
+  <!-- ===== Cadastrar no Catalog (robô) =====
+       A tela só monta o pedido. O cadastro em si é feito por um robô que roda
+       no GitHub Actions, com a conta rpa_ia — por isso ninguém precisa instalar
+       nada nem deixar máquina ligada. -->
+  <div id="view-rpa" class="hidden tagView">
+    <div class="card">
+      <h2>Cadastrar no Catalog</h2>
+      <p class="note">Escolha os PNGs das estampas, confira os identifiers e mande. O robô cadastra uma por uma no Catalog v3 e o progresso aparece aqui embaixo — pode fechar a aba, o trabalho continua.</p>
+
+      <p class="note hidden" id="rpaNaoConfig" style="color:#f59e0b"><strong>O robô ainda não está ligado:</strong> faltam os segredos do GitHub no app. Enquanto isso o botão fica desabilitado.</p>
+
+      <div class="tipoField">
+        <span class="tipoLabel">Categoria</span>
+        <div class="tipoSeg" id="rpaCategoria">
+          <button type="button" class="tipoBtn active" data-rpacat="case">Case</button>
+          <button type="button" class="tipoBtn" data-rpacat="termico">Térmico</button>
+          <button type="button" class="tipoBtn" data-rpacat="textil">Têxtil</button>
+        </div>
+      </div>
+
+      <div class="tipoField hidden" id="rpaMaterialField">
+        <span class="tipoLabel">Material base</span>
+        <select id="rpaMaterial" class="amInput"></select>
+      </div>
+
+      <div class="tipoField">
+        <span class="tipoLabel">Tipo do elemento</span>
+        <select id="rpaElementType" class="amInput">
+          <option value="Imagem (Sua foto)">Imagem (Sua foto)</option>
+          <option value="Background">Background</option>
+          <option value="Art">Art</option>
+        </select>
+      </div>
+
+      <div class="tipoField">
+        <span class="tipoLabel">Grupos de adaptação</span>
+        <div id="rpaGrupos" class="rpaGrupos"></div>
+      </div>
+
+      <div class="tipoField hidden" id="rpaRapportField">
+        <span class="tipoLabel">Rapport (só térmico)</span>
+        <label class="rpaCheck"><input type="checkbox" id="rpaRapport" /> Adicionar texto e ligar o Rapport</label>
+      </div>
+
+      <div class="hidden" id="rpaFonteBar">
+        <div class="tipoField">
+          <span class="tipoLabel">Fonte</span>
+          <input id="rpaNomeFonte" class="amInput" placeholder="poppins" autocomplete="off" />
+        </div>
+        <div class="tipoField">
+          <span class="tipoLabel">Tamanho (Escala X)</span>
+          <input id="rpaTamanhoFonte" class="amInput" placeholder="0.4" autocomplete="off" />
+        </div>
+        <div class="tipoField">
+          <span class="tipoLabel">Cor do texto</span>
+          <input id="rpaCorFonte" class="amInput" placeholder="#000000" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="tipoField">
+        <span class="tipoLabel">Estampas (PNG)</span>
+        <input id="rpaFiles" type="file" accept="image/png" multiple class="hidden" />
+        <button type="button" class="psdMiniBtn" id="rpaEscolher">Escolher PNGs</button>
+      </div>
+
+      <ul class="tagList" id="rpaLista"><li class="tagEmpty">Nenhuma estampa escolhida ainda.</li></ul>
+
+      <button class="genBtn" id="rpaEnviar" type="button" disabled>Cadastrar estampas</button>
+      <p class="note" id="rpaMsg"></p>
+    </div>
+
+    <div class="card hidden" id="rpaProgressoCard">
+      <h2>Progresso</h2>
+      <p class="note" id="rpaProgressoResumo"></p>
+      <div class="rpaLog" id="rpaLog"></div>
+      <p class="note" id="rpaRunLink"></p>
+    </div>
+
+    <div class="card">
+      <h2>Lotes anteriores</h2>
+      <ul class="tagList" id="rpaLotes"><li class="tagEmpty">Carregando…</li></ul>
     </div>
   </div>
 
@@ -1222,7 +1323,7 @@
   // ---- Menu lateral ----
   // Views reais (têm container próprio). O resto do menu ainda não foi construído
   // e cai no placeholder #view-soon (🚧), com o título vindo do próprio item.
-  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar', tag: 'view-tag', copy: 'view-copy' };
+  const REAL_VIEWS = { psd: 'view-psd', id: 'view-id', estampas: 'view-estampas', adaptar: 'view-adaptar', tag: 'view-tag', copy: 'view-copy', rpa: 'view-rpa' };
   const SOON_NOTE = {
     'cad-geral': 'Panorama do cadastro de estampas. Em construção.',
     'cad-futebol': 'Cadastro das estampas de futebol. Em construção.',
@@ -1250,6 +1351,7 @@
     if (view === 'psd') ensurePsdMaskOptions();
     if (view === 'tag') loadTags();
     if (view === 'copy') loadCopys();
+    if (view === 'rpa') initRpa();
   }
 
   document.querySelectorAll('.sidenav .navItem').forEach((t) => {
@@ -3776,6 +3878,274 @@
     } catch (err) {
       itemStatusEl.textContent = 'Erro ao registrar: ' + err.message;
       itemStatusEl.className = 'psdItemRegStatus js-itemStatus err';
+    }
+  }
+
+  /* =====================================================================
+     Cadastrar no Catalog (robô)
+     =====================================================================
+     A tela monta o pedido, sobe um PNG por vez e depois só acompanha. Quem
+     cadastra é o robô no GitHub Actions -- daí o progresso vir por polling
+     em vez de acontecer aqui.
+
+     O id do lote em andamento fica no localStorage: se a pessoa recarregar
+     a página (ou voltar depois), a tela volta a acompanhar de onde parou em
+     vez de "esquecer" um lote que continua rodando lá.
+  */
+  const RPA_JOB_KEY = 'rpaJobEmAndamento';
+  let rpaConfig = null;
+  let rpaIniciado = false;
+  let rpaArquivos = [];      // [{file, identifier}]
+  let rpaCategoriaAtual = 'case';
+  let rpaPollTimer = null;
+  let rpaUltimoEvento = 0;
+
+  function rpaSlug(txt) {
+    return String(txt)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/\.png$/i, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  }
+
+  async function initRpa() {
+    if (rpaIniciado) return;
+    rpaIniciado = true;
+    try {
+      rpaConfig = await (await fetch('/api/rpa/config')).json();
+    } catch (e) {
+      $('rpaMsg').textContent = 'Não consegui carregar as opções: ' + e.message;
+      return;
+    }
+    if (!rpaConfig.configurado) $('rpaNaoConfig').classList.remove('hidden');
+
+    document.querySelectorAll('#rpaCategoria .tipoBtn').forEach((b) => {
+      b.addEventListener('click', () => {
+        document.querySelectorAll('#rpaCategoria .tipoBtn').forEach((x) => x.classList.remove('active'));
+        b.classList.add('active');
+        rpaCategoriaAtual = b.dataset.rpacat;
+        rpaAplicarCategoria();
+      });
+    });
+    $('rpaEscolher').addEventListener('click', () => $('rpaFiles').click());
+    $('rpaFiles').addEventListener('change', (ev) => {
+      for (const f of ev.target.files) {
+        if (f.type !== 'image/png') continue;
+        rpaArquivos.push({ file: f, identifier: rpaSlug(f.name) });
+      }
+      ev.target.value = '';
+      rpaRenderLista();
+    });
+    $('rpaRapport').addEventListener('change', () => {
+      $('rpaFonteBar').classList.toggle('hidden', !$('rpaRapport').checked);
+    });
+    $('rpaEnviar').addEventListener('click', rpaEnviarLote);
+
+    rpaAplicarCategoria();
+    rpaRenderLista();
+    rpaCarregarLotes();
+
+    const emAndamento = localStorage.getItem(RPA_JOB_KEY);
+    if (emAndamento) rpaAcompanhar(emAndamento);
+  }
+
+  function rpaAplicarCategoria() {
+    const cat = rpaCategoriaAtual;
+    const ehTermico = cat === 'termico';
+
+    const materiais = (rpaConfig.materiaisPorCategoria || {})[cat] || [];
+    $('rpaMaterialField').classList.toggle('hidden', materiais.length === 0);
+    $('rpaMaterial').innerHTML = materiais.map((m) => `<option value="${m.value}">${m.label}</option>`).join('');
+
+    $('rpaRapportField').classList.toggle('hidden', !ehTermico);
+    if (!ehTermico) {
+      $('rpaRapport').checked = false;
+      $('rpaFonteBar').classList.add('hidden');
+    }
+
+    const grupos = (rpaConfig.gruposPorCategoria || {})[cat] || [];
+    $('rpaGrupos').innerHTML = grupos.length
+      ? grupos.map((g, i) => `<label class="rpaCheck"><input type="checkbox" value="${g.replace(/"/g, '&quot;')}" id="rpaG${i}" /> ${g}</label>`).join('')
+      : '<span class="note">Nenhum grupo de adaptação disponível pra essa categoria ainda.</span>';
+  }
+
+  function rpaRenderLista() {
+    const ul = $('rpaLista');
+    if (!rpaArquivos.length) {
+      ul.innerHTML = '<li class="tagEmpty">Nenhuma estampa escolhida ainda.</li>';
+    } else {
+      ul.innerHTML = '';
+      rpaArquivos.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.className = 'rpaLinha';
+        const input = document.createElement('input');
+        input.className = 'amInput';
+        input.value = item.identifier;
+        input.maxLength = 80;
+        input.addEventListener('input', () => { rpaArquivos[i].identifier = input.value.trim().toLowerCase(); rpaAtualizarBotao(); });
+        const arq = document.createElement('span');
+        arq.className = 'rpaArq';
+        arq.textContent = item.file.name;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'rpaRemover';
+        rm.title = 'Remover';
+        rm.textContent = '✕';
+        rm.addEventListener('click', () => { rpaArquivos.splice(i, 1); rpaRenderLista(); });
+        li.append(input, arq, rm);
+        ul.appendChild(li);
+      });
+    }
+    rpaAtualizarBotao();
+  }
+
+  function rpaAtualizarBotao() {
+    const validos = rpaArquivos.length > 0 && rpaArquivos.every((a) => /^[a-z0-9][a-z0-9-]{1,80}$/.test(a.identifier));
+    $('rpaEnviar').disabled = !validos || !rpaConfig || !rpaConfig.configurado || !!rpaPollTimer;
+    $('rpaEnviar').textContent = rpaArquivos.length > 1
+      ? `Cadastrar ${rpaArquivos.length} estampas`
+      : 'Cadastrar estampas';
+  }
+
+  function rpaLerArquivo(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => reject(new Error('não consegui ler ' + file.name));
+      fr.readAsDataURL(file);
+    });
+  }
+
+  async function rpaPost(rota, corpo) {
+    const r = await fetch(rota, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(corpo),
+    });
+    const dados = await r.json().catch(() => ({}));
+    if (!r.ok || dados.error) throw new Error(dados.error || `falha em ${rota} (${r.status})`);
+    return dados;
+  }
+
+  async function rpaEnviarLote() {
+    const msg = $('rpaMsg');
+    $('rpaEnviar').disabled = true;
+    try {
+      const grupos = Array.from($('rpaGrupos').querySelectorAll('input:checked')).map((i) => i.value);
+      const material = $('rpaMaterialField').classList.contains('hidden') ? '' : $('rpaMaterial').value;
+      const rapport = $('rpaRapport').checked;
+
+      msg.textContent = 'Criando o lote…';
+      const { job_id, arquivos } = await rpaPost('/api/rpa/lote', {
+        element_type: $('rpaElementType').value,
+        estampas: rpaArquivos.map((a) => ({
+          identifier: a.identifier,
+          categoria: rpaCategoriaAtual,
+          material,
+          grupos,
+          rapport,
+          nome_fonte: rapport ? $('rpaNomeFonte').value.trim() : '',
+          tamanho_fonte: rapport ? $('rpaTamanhoFonte').value.trim() : '',
+          cor_fonte: rapport ? $('rpaCorFonte').value.trim() : '',
+        })),
+      });
+
+      for (let i = 0; i < rpaArquivos.length; i++) {
+        msg.textContent = `Enviando imagem ${i + 1} de ${rpaArquivos.length}…`;
+        const dataUrl = await rpaLerArquivo(rpaArquivos[i].file);
+        await rpaPost('/api/rpa/lote/imagem', { job_id, arquivo: arquivos[i].arquivo, dataUrl });
+      }
+
+      msg.textContent = 'Acionando o robô…';
+      await rpaPost('/api/rpa/lote/disparar', { job_id });
+
+      rpaArquivos = [];
+      rpaRenderLista();
+      msg.textContent = 'Lote enviado. O robô assume daqui — acompanhe abaixo.';
+      localStorage.setItem(RPA_JOB_KEY, job_id);
+      rpaAcompanhar(job_id);
+      rpaCarregarLotes();
+    } catch (e) {
+      msg.textContent = 'Não deu: ' + e.message;
+      rpaAtualizarBotao();
+    }
+  }
+
+  function rpaAcompanhar(jobId) {
+    $('rpaProgressoCard').classList.remove('hidden');
+    $('rpaLog').innerHTML = '<div class="vazio">Aguardando o robô…</div>';
+    rpaUltimoEvento = 0;
+    if (rpaPollTimer) clearInterval(rpaPollTimer);
+
+    const tick = async () => {
+      let dados;
+      try {
+        dados = await (await fetch(`/api/rpa/status?job=${encodeURIComponent(jobId)}&desde=${rpaUltimoEvento}`)).json();
+      } catch {
+        return; // falha de rede não mata o acompanhamento; tenta no próximo tick
+      }
+      if (dados.error) {
+        clearInterval(rpaPollTimer); rpaPollTimer = null;
+        $('rpaProgressoResumo').textContent = 'Não achei esse lote.';
+        localStorage.removeItem(RPA_JOB_KEY);
+        rpaAtualizarBotao();
+        return;
+      }
+
+      const log = $('rpaLog');
+      if (dados.eventos.length) {
+        if (log.querySelector('.vazio')) log.innerHTML = '';
+        for (const ev of dados.eventos) {
+          const div = document.createElement('div');
+          div.className = 'l ' + ev.status;
+          const b = document.createElement('b');
+          b.textContent = ev.identifier || '—';
+          const s = document.createElement('span');
+          s.textContent = ev.message;
+          div.append(b, s);
+          log.appendChild(div);
+          rpaUltimoEvento = Math.max(rpaUltimoEvento, ev.id);
+        }
+        log.scrollTop = log.scrollHeight;
+      }
+
+      const j = dados.job;
+      const rotulo = { montando: 'montando o lote', na_fila: 'na fila do robô', rodando: 'rodando', concluido: 'concluído', erro: 'terminou com erro' }[j.status] || j.status;
+      $('rpaProgressoResumo').textContent = `Lote ${j.jobId} — ${j.total} estampa(s) — ${rotulo}.`;
+      $('rpaRunLink').innerHTML = j.runUrl
+        ? `Log completo do robô: <a href="${j.runUrl}" target="_blank" rel="noopener">abrir no GitHub</a>`
+        : '';
+
+      if (!j.aberto) {
+        clearInterval(rpaPollTimer); rpaPollTimer = null;
+        localStorage.removeItem(RPA_JOB_KEY);
+        rpaAtualizarBotao();
+        rpaCarregarLotes();
+      }
+    };
+
+    rpaPollTimer = setInterval(tick, 2500);
+    rpaAtualizarBotao();
+    tick();
+  }
+
+  async function rpaCarregarLotes() {
+    const ul = $('rpaLotes');
+    try {
+      const { lotes } = await (await fetch('/api/rpa/lotes')).json();
+      if (!lotes || !lotes.length) {
+        ul.innerHTML = '<li class="tagEmpty">Nenhum lote ainda.</li>';
+        return;
+      }
+      ul.innerHTML = lotes.map((l) => {
+        const quando = (l.criadoEm || '').replace('T', ' ').slice(0, 16);
+        const link = l.runUrl ? ` · <a href="${l.runUrl}" target="_blank" rel="noopener">log</a>` : '';
+        return `<li>${quando} · ${l.total} estampa(s) · <strong>${l.status}</strong>${link}</li>`;
+      }).join('');
+    } catch (e) {
+      ul.innerHTML = `<li class="tagEmpty">Não consegui carregar: ${e.message}</li>`;
     }
   }
 </script>
