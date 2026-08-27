@@ -223,6 +223,17 @@ O app NÃO tem dados próprios de catálogo; consulta bancos externos:
 
 Tabelas próprias em `env.DB`: `rpa_jobs`, `rpa_estampas`, `rpa_eventos`, `rpa_imagens` (criadas por `ensureRpaTables`).
 
+**Rastro (`traceRpa`).** Toda chamada `/api/rpa/*` sai no `console.log` do Worker como
+`RPA {"evento":...}` — `chegou` (método, rota, query com valores sensíveis escondidos, e **quem**
+chamou: robô com `x-rpa-token`, tela com usuário logado, ou anônimo), `respondeu` (status + ms),
+`estourou` (erro + ms), mais `disparando` / `github-aceitou` (o momento em que o GitHub entra) e
+`pedaco-recebido` (upload das imagens em partes). Ler com `getAppLogs`.
+
+Existe porque o robô tem rastro próprio e sem este lado metade da conversa ficava invisível:
+quando um lote travava, "o robô não pediu", "o app não respondeu" e "o app respondeu errado"
+eram indistinguíveis. Mesma regra de redação do lado do robô — nome de campo sim, valor de
+credencial nunca.
+
 > **Por que as imagens não passam pelo GitHub:** os repositórios (`catalog-estampas-app` e este)
 > são **públicos**. PNG commitado num branch = arte da Gocase exposta na internet, e o git guarda no
 > histórico mesmo depois de apagado. Então os PNGs moram no `env.DB` em pedaços (uma estampa passa

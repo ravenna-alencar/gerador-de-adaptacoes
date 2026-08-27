@@ -61,6 +61,45 @@ function json(body: unknown, status = 200, extraHeaders?: Record<string, string>
   });
 }
 
+/* ==================== Rastro das rotas do robô ====================
+ *
+ * O outro lado desta integração (o robô, no GitHub Actions) tem um rastro
+ * detalhado. Sem o mesmo aqui, metade da conversa fica invisível: quando um
+ * lote trava, não dava pra saber se o robô não pediu, se o app não respondeu,
+ * ou se respondeu errado.
+ *
+ * Sai no `console.log` do Worker (visível no GoDeploy). Vale a MESMA regra do
+ * lado do robô: nome do campo sim, valor de credencial nunca. Aqui isso é
+ * ainda mais importante porque o corpo das chamadas carrega imagem em base64
+ * -- logar corpo inteiro entupiria o log e não ajudaria ninguém.
+ */
+const CAMPOS_SENSIVEIS = /token|secret|senha|password|auth|cookie|key|chave|b64|dados/i;
+
+/** Mantém os NOMES dos parâmetros e esconde os valores sensíveis. */
+function queryLimpa(url: URL): string {
+  const partes: string[] = [];
+  url.searchParams.forEach((valor, nome) => {
+    partes.push(CAMPOS_SENSIVEIS.test(nome) ? `${nome}=<${valor.length} chars>` : `${nome}=${valor}`);
+  });
+  return partes.join('&');
+}
+
+function traceRpa(evento: string, campos: Record<string, unknown>): void {
+  try {
+    const limpo: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(campos)) {
+      limpo[k] = CAMPOS_SENSIVEIS.test(k)
+        ? `<oculto ${String(v ?? '').length} chars>`
+        : typeof v === 'string' && v.length > 300
+          ? v.slice(0, 300) + `…(+${v.length - 300})`
+          : v;
+    }
+    console.log('RPA ' + JSON.stringify({ evento, ...limpo }));
+  } catch {
+    // Log nunca derruba requisição.
+  }
+}
+
 const PIAPP_MCP = 'https://piapp-v2.vercel.app/api/ai/mcp';
 
 /** Decodifica um data URL (data:image/png;base64,....) em bytes + mime. */
@@ -1072,6 +1111,28 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
+
+    // Só as rotas do robô entram no rastro. As outras (geração de imagem,
+    // catálogo) já têm o próprio caminho de erro e logar tudo viraria ruído.
+    const rastrear = pathname.startsWith('/api/rpa');
+    const t0 = Date.now();
+    if (rastrear) {
+      traceRpa('chegou', {
+        metodo: request.method,
+        rota: pathname,
+        query: queryLimpa(url),
+        // Quem está chamando: o robô manda o x-rpa-token; a tela manda o
+        // e-mail de quem está logado. Saber isso separa "o robô sumiu" de
+        // "a tela não pediu".
+        quem: request.headers.get('x-rpa-token')
+          ? 'robo (com x-rpa-token)'
+          : request.headers.get('x-godeploy-user-email')
+            ? 'tela (usuario logado)'
+            : 'anonimo',
+      });
+    }
+
+    const resposta = await (async (): Promise<Response> => {
     try {
       // ==================== RPA — cadastro no Catalog v3 ====================
 
@@ -1187,6 +1248,9 @@ export default {
             `UPDATE rpa_estampas SET enviada = 1 WHERE job_id = ? AND arquivo = ?`, [jobId, arquivo],
           );
         }
+        traceRpa('pedaco-recebido', {
+          job: jobId, arquivo, parte, total_partes: totalPartes, completa,
+        });
         return json({ ok: true, completa });
       }
 
@@ -1213,7 +1277,15 @@ export default {
           return json({ error: `faltou subir a imagem de: ${faltando.join(', ')}` }, 400);
         }
 
+        traceRpa('disparando', {
+          job: jobId,
+          estampas: est.rows.length,
+          element_type: String(jobRes.rows[0].element_type || ''),
+        });
         const runUrl = await rpaGhDispatch(env, jobId);
+        // Sem esta linha, "acionei o GitHub" e "o GitHub aceitou" eram
+        // indistinguiveis quando nada acontecia depois.
+        traceRpa('github-aceitou', { job: jobId, run_url: runUrl || '(sem url)' });
 
         await env.DB.exec(
           `UPDATE rpa_jobs SET status = 'na_fila', run_url = ? WHERE job_id = ?`, [runUrl, jobId],
@@ -2017,8 +2089,16 @@ ORDER BY p.id DESC LIMIT 1`;
         });
       }
     } catch (e) {
-      return json({ error: String((e as Error).message || e) }, 500);
+      const erro = String((e as Error).message || e);
+      if (rastrear) traceRpa('estourou', { rota: pathname, erro: erro.slice(0, 300), ms: Date.now() - t0 });
+      return json({ error: erro }, 500);
     }
     return new Response('Not found', { status: 404 });
+    })();
+
+    if (rastrear) {
+      traceRpa('respondeu', { rota: pathname, status: resposta.status, ms: Date.now() - t0 });
+    }
+    return resposta;
   },
 };
