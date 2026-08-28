@@ -1354,6 +1354,12 @@ export default {
             method: 'POST',
             body: { job_id: jobId, arquivo, parte, total_partes: totalPartes, dadosB64: String(body.dadosB64) },
           });
+          // 404 e 409 da ponte querem dizer coisas específicas ("esse arquivo
+          // não é desse lote", "esse lote já saiu"). Repassa o código, senão
+          // viram um 502 genérico e a tela mente sobre o que aconteceu.
+          if (status === 404 || status === 409) {
+            return json({ error: erroDaPonte(dados, status) }, status);
+          }
           if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
           traceRpa('pedaco-repassado', {
             job: jobId, arquivo, parte, total_partes: totalPartes, completa: !!dados.completa,
@@ -1405,6 +1411,13 @@ export default {
           }
           if (String(st.dados.status) !== 'montando') {
             return json({ error: 'este lote já foi disparado' }, 409);
+          }
+
+          // Um upload que falha no meio deixaria o lote sair sem PNG, e o robô
+          // descobriria isso no meio do Actions. A ponte diz quem faltou.
+          const faltando = Array.isArray(st.dados.faltando) ? st.dados.faltando.map(String) : [];
+          if (faltando.length) {
+            return json({ error: `faltou subir a imagem de: ${faltando.join(', ')}` }, 400);
           }
 
           // Sem a sessão guardada o robô abre o Catalog e para na tela de
@@ -1587,7 +1600,8 @@ export default {
           if (status === 404) return json({ error: 'lote não encontrado' }, 404);
           if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
           // A ponte responde achatado; a tela espera { job, eventos }. Traduz
-          // aqui pra não mexer no front. (criadoEm/terminadoEm a ponte não dá.)
+          // aqui pra não mexer no front. (terminadoEm a ponte não guarda -- e
+          // a tela não usa; quando alguém precisar, é uma linha lá e uma aqui.)
           const st = String(dados.status || 'montando');
           return json({
             job: {
@@ -1596,7 +1610,7 @@ export default {
               total: Number(dados.total || 0),
               erro: (dados.erro as string | null) || null,
               runUrl: (dados.run_url as string | null) || null,
-              criadoEm: '',
+              criadoEm: String(dados.criado_em || ''),
               terminadoEm: null,
               aberto: RPA_STATUS_ABERTOS.includes(st),
             },
