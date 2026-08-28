@@ -603,6 +603,14 @@
 .rpaLog .l.success{color:#22c55e}
 .rpaLog .l.error{color:#ef4444}
 .rpaLog .vazio{opacity:.6}
+.rpaAviso{font-size:.8rem;line-height:1.45;border-radius:8px;padding:.55rem .7rem;margin:.6rem 0 0}
+.rpaAviso.ok{color:var(--success);background:var(--success-bg);border:1px solid var(--success-border)}
+.rpaAviso.falta{color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn)}
+.rpaCodigo{margin-top:.7rem;text-align:center;border:1px dashed var(--border);border-radius:10px;padding:.9rem .7rem}
+.rpaCodigoNum{font-size:2.3rem;font-weight:800;letter-spacing:.12em;line-height:1.1;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.rpaCodigo .note{margin:.5rem 0 .7rem}
+.rpaMotivo{color:var(--warn)}
 </style>
 
 <header class="topbar">
@@ -750,6 +758,26 @@
        no GitHub Actions, com a conta rpa_ia — por isso ninguém precisa instalar
        nada nem deixar máquina ligada. -->
   <div id="view-rpa" class="hidden tagView">
+    <!-- O robô entra no Catalog com a conta de quem pediu o lote, então o
+         acesso da pessoa tem que estar guardado antes do disparo. Este card
+         vem primeiro justamente por ser a condição pro resto funcionar. -->
+    <div class="card hidden" id="rpaAcessoCard">
+      <h2>Acesso ao Catalog</h2>
+      <p class="note">O robô cadastra usando a <strong>sua</strong> conta do Catalog. Pra isso ele precisa do seu acesso guardado — você faz isso uma vez, pelo programa <code>Conectar_Catalog</code> no seu PC.</p>
+
+      <p class="rpaAviso" id="rpaSessaoStatus">Verificando seu acesso…</p>
+
+      <div class="tipoField hidden" id="rpaSessaoAcoes" style="margin-top:.7rem">
+        <button type="button" class="psdMiniBtn" id="rpaConectar">Conectar minha conta do Catalog</button>
+      </div>
+
+      <div class="rpaCodigo hidden" id="rpaCodigoBox">
+        <div class="rpaCodigoNum" id="rpaCodigoNum">—</div>
+        <p class="note" id="rpaCodigoTexto"></p>
+        <button type="button" class="psdMiniBtn" id="rpaOutroCodigo">Gerar outro código</button>
+      </div>
+    </div>
+
     <div class="card">
       <h2>Cadastrar no Catalog</h2>
       <p class="note">Escolha os PNGs das estampas, confira os identifiers e mande. O robô cadastra uma por uma no Catalog v3 e o progresso aparece aqui embaixo — pode fechar a aba, o trabalho continua.</p>
@@ -813,6 +841,7 @@
       <ul class="tagList" id="rpaLista"><li class="tagEmpty">Nenhuma estampa escolhida ainda.</li></ul>
 
       <button class="genBtn" id="rpaEnviar" type="button" disabled>Cadastrar estampas</button>
+      <p class="note rpaMotivo hidden" id="rpaMotivoBloqueio"></p>
       <p class="note" id="rpaMsg"></p>
     </div>
 
@@ -3899,6 +3928,8 @@
   let rpaCategoriaAtual = 'case';
   let rpaPollTimer = null;
   let rpaUltimoEvento = 0;
+  let rpaSessao = { existe: false };   // acesso da pessoa ao Catalog, guardado na ponte
+  let rpaSessaoTimer = null;           // enquanto o código está na tela, espera o programinha
 
   function rpaSlug(txt) {
     return String(txt)
@@ -3942,10 +3973,13 @@
       $('rpaFonteBar').classList.toggle('hidden', !$('rpaRapport').checked);
     });
     $('rpaEnviar').addEventListener('click', rpaEnviarLote);
+    $('rpaConectar').addEventListener('click', rpaPedirCodigo);
+    $('rpaOutroCodigo').addEventListener('click', rpaPedirCodigo);
 
     rpaAplicarCategoria();
     rpaRenderLista();
     rpaCarregarLotes();
+    rpaCarregarSessao();
 
     const emAndamento = localStorage.getItem(RPA_JOB_KEY);
     if (emAndamento) rpaAcompanhar(emAndamento);
@@ -4003,7 +4037,18 @@
 
   function rpaAtualizarBotao() {
     const validos = rpaArquivos.length > 0 && rpaArquivos.every((a) => /^[a-z0-9][a-z0-9-]{1,80}$/.test(a.identifier));
-    $('rpaEnviar').disabled = !validos || !rpaConfig || !rpaConfig.configurado || !!rpaPollTimer;
+    // Montar o lote é livre; só o disparo depende do acesso ao Catalog.
+    const faltaAcesso = !!(rpaConfig && rpaConfig.ponte) && !rpaSessao.existe;
+    $('rpaEnviar').disabled = !validos || !rpaConfig || !rpaConfig.configurado || !!rpaPollTimer || faltaAcesso;
+
+    // Botão cinza sem explicação é o que gera chamado. O motivo fica escrito.
+    const motivo = $('rpaMotivoBloqueio');
+    const texto = faltaAcesso
+      ? 'Conecte sua conta do Catalog ali em cima para poder disparar o lote. Você já pode montar a lista de estampas.'
+      : (rpaPollTimer ? 'Tem um lote em andamento — espere ele terminar.' : '');
+    motivo.textContent = texto;
+    motivo.classList.toggle('hidden', !texto);
+
     $('rpaEnviar').textContent = rpaArquivos.length > 1
       ? `Cadastrar ${rpaArquivos.length} estampas`
       : 'Cadastrar estampas';
@@ -4151,6 +4196,82 @@
     rpaPollTimer = setInterval(tick, 2500);
     rpaAtualizarBotao();
     tick();
+  }
+
+  /* ---- Acesso ao Catalog: ver se está guardado e pedir o código ----
+     A sessão mora na ponte, uma por pessoa. Quem a coloca lá é o programinha
+     Conectar_Catalog, rodando no PC da pessoa; o código curto abaixo é como
+     ele prova de quem é a sessão que está mandando. */
+
+  function rpaHorasTexto(h) {
+    if (h === null || h === undefined) return null;
+    if (h < 1) return 'menos de 1 h';
+    if (h < 48) return `${Math.round(h)} h`;
+    return `${Math.round(h / 24)} dias`;
+  }
+
+  async function rpaCarregarSessao() {
+    // Sem ponte não existe sessão por pessoa: o card não faz sentido.
+    if (!rpaConfig || !rpaConfig.ponte) {
+      $('rpaAcessoCard').classList.add('hidden');
+      return;
+    }
+    $('rpaAcessoCard').classList.remove('hidden');
+
+    const box = $('rpaSessaoStatus');
+    try {
+      const r = await fetch('/api/rpa/sessao/estado');
+      const d = await r.json();
+      if (d.error) throw new Error(d.error);
+      rpaSessao.existe = !!d.existe;
+
+      if (d.existe) {
+        const quando = rpaHorasTexto(d.horas);
+        box.className = 'rpaAviso ok';
+        box.textContent = quando
+          ? `Seu acesso ao Catalog está guardado (atualizado há ${quando}).`
+          : 'Seu acesso ao Catalog está guardado.';
+        $('rpaConectar').textContent = 'Reconectar minha conta';
+        $('rpaCodigoBox').classList.add('hidden');
+        if (rpaSessaoTimer) { clearInterval(rpaSessaoTimer); rpaSessaoTimer = null; }
+      } else {
+        box.className = 'rpaAviso falta';
+        box.textContent = 'Seu acesso ao Catalog ainda não está guardado. Conecte sua conta para o robô cadastrar no seu nome.';
+        $('rpaConectar').textContent = 'Conectar minha conta do Catalog';
+      }
+    } catch (e) {
+      rpaSessao.existe = false;
+      box.className = 'rpaAviso falta';
+      box.textContent = 'Não consegui verificar seu acesso ao Catalog: ' + e.message;
+    }
+    $('rpaSessaoAcoes').classList.remove('hidden');
+    rpaAtualizarBotao();
+  }
+
+  async function rpaPedirCodigo() {
+    const btn = $('rpaConectar');
+    const rotulo = btn.textContent;
+    btn.disabled = true;
+    $('rpaOutroCodigo').disabled = true;
+    btn.textContent = 'Gerando código…';
+    try {
+      const d = await rpaPost('/api/rpa/pareamento', {});
+      $('rpaCodigoNum').textContent = d.codigo || '—';
+      $('rpaCodigoTexto').textContent =
+        `Abra o programa Conectar_Catalog no seu PC e digite este código. Ele vale ${d.valido_por_minutos || 10} minutos.`;
+      $('rpaCodigoBox').classList.remove('hidden');
+      // Quando o programinha entregar a sessão, a tela vira verde sozinha --
+      // ninguém precisa recarregar pra descobrir que deu certo.
+      if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
+      rpaSessaoTimer = setInterval(rpaCarregarSessao, 4000);
+    } catch (e) {
+      $('rpaSessaoStatus').className = 'rpaAviso falta';
+      $('rpaSessaoStatus').textContent = 'Não consegui gerar o código: ' + e.message;
+    } finally {
+      btn.disabled = false;
+      $('rpaOutroCodigo').disabled = false;
+      btn.textContent = rotulo;
+    }
   }
 
   async function rpaCarregarLotes() {

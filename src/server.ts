@@ -50,7 +50,8 @@ interface Env {
   GITHUB_REPO?: string;         // "owner/repo" do robô
   GITHUB_REF?: string;          // branch do código (default: main)
   GITHUB_WORKFLOW?: string;     // arquivo do workflow (default: cadastrar-estampas.yml)
-  RPA_TOKEN?: string;           // segredo compartilhado: só o robô pode reportar progresso
+  RPA_TOKEN?: string;           // segredo compartilhado entre este app, a ponte e o robô
+  PONTE_URL?: string;           // app público que guarda lote, imagens e sessão (RPA Ponte)
   DB: Db;
 }
 
@@ -951,6 +952,19 @@ function prettyIdentifier(id: string): string {
 
    A sessão do Catalog NÃO passa por aqui: ela é um segredo do GitHub, usada
    só dentro do Actions. Este worker nunca vê credencial do Catalog.
+
+   ---- Mudança de 28/08/2026: a troca de dados saiu daqui ----
+
+   Este app exige login do Gogroup em TODA rota: o edge devolve 302 pra tela
+   de login antes do worker rodar, mesmo com o x-rpa-token no cabeçalho. Ou
+   seja, o robô no GitHub Actions nunca conseguiu falar com estas rotas.
+
+   Quem guarda o lote, as imagens e a sessão agora é a **RPA Ponte**, um app
+   público e pequeno onde toda rota exige o x-rpa-token. As rotas /api/rpa/*
+   daqui viraram repasse: a tela continua chamando as mesmas rotas, o worker
+   acrescenta o token e conversa com a ponte. **O token nunca chega no
+   navegador.** Se PONTE_URL não estiver configurada, tudo continua no env.DB
+   local, exatamente como antes.
 */
 
 const RPA_MATERIAL_CASE = 'standard-iphone11';
@@ -1104,6 +1118,55 @@ async function rpaGhDispatch(env: Env, jobId: string): Promise<string> {
   return `https://github.com/${repo}/actions/workflows/${workflow}`;
 }
 
+/* ==================== Repasse pra RPA Ponte ====================
+   A ponte é o app público (https://rpa-ponte.devgogroup.com) que guarda o
+   lote, os PNGs e a sessão do Catalog de cada pessoa. Tudo lá exige o
+   x-rpa-token, que só existe entre servidores -- por isso o repasse acontece
+   aqui dentro e não no navegador.
+
+   Sem PONTE_URL (ou sem RPA_TOKEN) nada disso liga e as rotas voltam a usar
+   o env.DB local: preferível a quebrar a aba inteira por falta de segredo. */
+function ponteAtiva(env: Env): boolean {
+  return !!(env.PONTE_URL && env.RPA_TOKEN);
+}
+
+async function ponteChamar(
+  env: Env,
+  rota: string,
+  init?: { method?: string; body?: unknown },
+): Promise<{ status: number; dados: Record<string, any> }> {
+  const base = String(env.PONTE_URL || '').replace(/\/+$/, '');
+  const temCorpo = init?.body !== undefined;
+  const r = await fetch(`${base}${rota}`, {
+    method: init?.method || 'GET',
+    headers: {
+      'x-rpa-token': String(env.RPA_TOKEN || ''),
+      ...(temCorpo ? { 'content-type': 'application/json' } : {}),
+    },
+    body: temCorpo ? JSON.stringify(init!.body) : undefined,
+  });
+  const texto = await r.text();
+  let dados: Record<string, any>;
+  try {
+    dados = texto ? JSON.parse(texto) : {};
+  } catch {
+    // A ponte é pública: um 302 pra login ou uma página de erro do edge
+    // chegariam aqui como HTML. Melhor dizer isso do que "undefined".
+    dados = { error: `a ponte respondeu algo que não é JSON (${r.status}): ${texto.slice(0, 200)}` };
+  }
+  return { status: r.status, dados };
+}
+
+function erroDaPonte(dados: Record<string, any>, status: number): string {
+  return String(dados?.error || `a ponte respondeu ${status}`);
+}
+
+/** O e-mail SEMPRE vem do cabeçalho do GoDeploy -- nunca do corpo da
+    requisição, senão qualquer um pede o código de pareamento de qualquer um. */
+function emailDeQuemChama(request: Request): string {
+  return (request.headers.get('x-godeploy-user-email') || '').trim().toLowerCase();
+}
+
 const RPA_ID_VALIDO = /^[a-z0-9][a-z0-9-]{1,80}$/;
 
 
@@ -1143,12 +1206,47 @@ export default {
           materiaisPorCategoria: RPA_MATERIAIS_POR_CATEGORIA,
           materialCasePadrao: RPA_MATERIAL_CASE,
           configurado: !!(env.GITHUB_TOKEN && env.GITHUB_REPO),
+          // Sem ponte não existe sessão por pessoa, e a tela não deve pedir
+          // pareamento (o robô usaria a sessão do GitHub, como antes).
+          ponte: ponteAtiva(env),
+        });
+      }
+
+      /* ---- Acesso ao Catalog: pareamento com o programinha da máquina ----
+         O robô entra no Catalog com a conta de quem pediu o lote, então a
+         sessão tem que sair do PC da pessoa. O código curto abaixo é o que
+         liga "a pessoa logada aqui" ao "programa rodando na máquina dela"
+         sem espalhar o x-rpa-token por computador nenhum. */
+
+      if (pathname === '/api/rpa/pareamento' && request.method === 'POST') {
+        if (!ponteAtiva(env)) return json({ error: 'a ponte não está configurada neste app' }, 503);
+        const email = emailDeQuemChama(request);
+        if (!email) return json({ error: 'não identifiquei quem está logado' }, 401);
+        const { status, dados } = await ponteChamar(env, '/pareamentos', {
+          method: 'POST',
+          body: { user_email: email },
+        });
+        if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+        return json({ codigo: dados.codigo, valido_por_minutos: dados.valido_por_minutos });
+      }
+
+      if (pathname === '/api/rpa/sessao/estado') {
+        if (!ponteAtiva(env)) return json({ existe: false, ponte: false });
+        const email = emailDeQuemChama(request);
+        if (!email) return json({ error: 'não identifiquei quem está logado' }, 401);
+        const { status, dados } = await ponteChamar(
+          env, `/sessao/estado?user=${encodeURIComponent(email)}`,
+        );
+        if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+        return json({
+          existe: !!dados.existe,
+          atualizada_em: dados.atualizada_em || null,
+          horas: typeof dados.horas === 'number' ? dados.horas : null,
         });
       }
 
       // Passo 1: cria o lote (só metadados -- as imagens vêm nas chamadas seguintes).
       if (pathname === '/api/rpa/lote' && request.method === 'POST') {
-        await ensureRpaTables(env);
         rpaGhConfig(env); // falha cedo e com mensagem clara se faltar segredo
         const body = (await request.json()) as {
           element_type?: string;
@@ -1173,33 +1271,60 @@ export default {
           if (!(cat in RPA_GRUPOS_POR_CATEGORIA)) return json({ error: `categoria desconhecida: "${cat}"` }, 400);
         }
 
+        // O id do lote continua nascendo aqui (é o que a tela guarda e o que
+        // vai pro GitHub); a ponte só recebe pronto.
         const jobId = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-        const userEmail = request.headers.get('x-godeploy-user-email') || null;
-        await env.DB.exec(
-          `INSERT INTO rpa_jobs (job_id, user_email, status, total, element_type)
-           VALUES (?, ?, 'montando', ?, ?)`,
-          [jobId, userEmail, lista.length, String(body.element_type || 'Imagem (Sua foto)')],
-        );
+        const userEmail = emailDeQuemChama(request) || null;
+        const elementType = String(body.element_type || 'Imagem (Sua foto)');
 
+        // Normaliza uma vez -- os dois caminhos (ponte e banco local) usam a
+        // mesma lista, e a tela precisa dos nomes de arquivo pra subir os PNGs.
         const arquivos: { ordem: number; identifier: string; arquivo: string }[] = [];
-        for (let i = 0; i < lista.length; i++) {
-          const e = lista[i];
+        const estampas = lista.map((e, i) => {
           const identifier = String(e.identifier || '').trim().toLowerCase();
           const categoria = String(e.categoria || 'case');
           const arquivo = `${String(i).padStart(2, '0')}_${identifier}.png`;
-          const material = categoria === 'case' ? RPA_MATERIAL_CASE : String(e.material || '');
+          arquivos.push({ ordem: i, identifier, arquivo });
+          return {
+            identifier,
+            arquivo,
+            categoria,
+            material: categoria === 'case' ? RPA_MATERIAL_CASE : String(e.material || ''),
+            grupos: Array.isArray(e.grupos) ? e.grupos : [],
+            rapport: !!e.rapport,
+            nome_fonte: String(e.nome_fonte || ''),
+            tamanho_fonte: String(e.tamanho_fonte || ''),
+            cor_fonte: String(e.cor_fonte || ''),
+          };
+        });
+
+        if (ponteAtiva(env)) {
+          const { status, dados } = await ponteChamar(env, '/jobs', {
+            method: 'POST',
+            body: { job_id: jobId, user_email: userEmail, element_type: elementType, estampas },
+          });
+          if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+          return json({ job_id: jobId, arquivos });
+        }
+
+        await ensureRpaTables(env);
+        await env.DB.exec(
+          `INSERT INTO rpa_jobs (job_id, user_email, status, total, element_type)
+           VALUES (?, ?, 'montando', ?, ?)`,
+          [jobId, userEmail, estampas.length, elementType],
+        );
+        for (let i = 0; i < estampas.length; i++) {
+          const e = estampas[i];
           await env.DB.exec(
             `INSERT INTO rpa_estampas
                (job_id, ordem, identifier, arquivo, categoria, material, grupos, rapport, nome_fonte, tamanho_fonte, cor_fonte)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              jobId, i, identifier, arquivo, categoria, material,
-              JSON.stringify(Array.isArray(e.grupos) ? e.grupos : []),
-              e.rapport ? 1 : 0,
-              String(e.nome_fonte || ''), String(e.tamanho_fonte || ''), String(e.cor_fonte || ''),
+              jobId, i, e.identifier, e.arquivo, e.categoria, e.material,
+              JSON.stringify(e.grupos), e.rapport ? 1 : 0,
+              e.nome_fonte, e.tamanho_fonte, e.cor_fonte,
             ],
           );
-          arquivos.push({ ordem: i, identifier, arquivo });
         }
         return json({ job_id: jobId, arquivos });
       }
@@ -1207,7 +1332,6 @@ export default {
       // Passo 2: os PNGs, em pedaços. Um pedaço por chamada -- requisição pequena
       // e a tela consegue mostrar progresso real de upload.
       if (pathname === '/api/rpa/lote/imagem' && request.method === 'POST') {
-        await ensureRpaTables(env);
         const body = (await request.json()) as {
           job_id?: string; arquivo?: string; parte?: number; total_partes?: number; dadosB64?: string;
         };
@@ -1225,6 +1349,19 @@ export default {
           return json({ error: 'pedaço muito grande (máx. ~512KB por chamada)' }, 400);
         }
 
+        if (ponteAtiva(env)) {
+          const { status, dados } = await ponteChamar(env, '/jobs/imagem', {
+            method: 'POST',
+            body: { job_id: jobId, arquivo, parte, total_partes: totalPartes, dadosB64: String(body.dadosB64) },
+          });
+          if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+          traceRpa('pedaco-repassado', {
+            job: jobId, arquivo, parte, total_partes: totalPartes, completa: !!dados.completa,
+          });
+          return json({ ok: true, completa: !!dados.completa });
+        }
+
+        await ensureRpaTables(env);
         const dono = await env.DB.query(
           `SELECT e.arquivo FROM rpa_estampas e
              JOIN rpa_jobs j ON j.job_id = e.job_id
@@ -1256,11 +1393,58 @@ export default {
 
       // Passo 3: avisa o robô. Nenhum arquivo sai daqui -- ele vem buscar.
       if (pathname === '/api/rpa/lote/disparar' && request.method === 'POST') {
-        await ensureRpaTables(env);
         const body = (await request.json()) as { job_id?: string };
         const jobId = String(body.job_id || '');
         if (!jobId) return json({ error: 'job_id obrigatório' }, 400);
 
+        if (ponteAtiva(env)) {
+          const st = await ponteChamar(env, `/jobs/status?job=${encodeURIComponent(jobId)}`);
+          if (st.status === 404) return json({ error: 'lote não encontrado' }, 404);
+          if (st.status >= 400 || st.dados.error) {
+            return json({ error: erroDaPonte(st.dados, st.status) }, 502);
+          }
+          if (String(st.dados.status) !== 'montando') {
+            return json({ error: 'este lote já foi disparado' }, 409);
+          }
+
+          // Sem a sessão guardada o robô abre o Catalog e para na tela de
+          // login -- gastando 2 minutos de Actions pra falhar. Barra aqui.
+          const email = emailDeQuemChama(request);
+          if (!email) return json({ error: 'não identifiquei quem está logado' }, 401);
+          const sess = await ponteChamar(env, `/sessao/estado?user=${encodeURIComponent(email)}`);
+          if (sess.status >= 400 || sess.dados.error) {
+            return json({ error: erroDaPonte(sess.dados, sess.status) }, 502);
+          }
+          if (!sess.dados.existe) {
+            return json({
+              error: 'seu acesso ao Catalog não está guardado. Conecte sua conta ali em cima antes de disparar o lote.',
+            }, 409);
+          }
+
+          traceRpa('disparando', {
+            job: jobId,
+            estampas: Number(st.dados.total || 0),
+            element_type: '(na ponte)',
+          });
+          const runUrlPonte = await rpaGhDispatch(env, jobId);
+          traceRpa('github-aceitou', { job: jobId, run_url: runUrlPonte || '(sem url)' });
+
+          const fila = await ponteChamar(env, '/jobs/na-fila', {
+            method: 'POST',
+            body: { job_id: jobId, run_url: runUrlPonte },
+          });
+          // O robô já foi acionado; se a ponte não anotou, a tela ficaria
+          // vendo "montando" pra sempre. Melhor dizer o que houve.
+          if (fila.status >= 400 || fila.dados.error) {
+            return json({
+              error: `o robô foi acionado, mas a ponte não anotou o disparo: ${erroDaPonte(fila.dados, fila.status)}`,
+              run_url: runUrlPonte,
+            }, 502);
+          }
+          return json({ ok: true, run_url: runUrlPonte });
+        }
+
+        await ensureRpaTables(env);
         const jobRes = await env.DB.query(
           `SELECT status, element_type FROM rpa_jobs WHERE job_id = ?`, [jobId],
         );
@@ -1391,11 +1575,42 @@ export default {
 
       // A tela perguntando "e aí, como vai?" -- de 2 em 2 segundos.
       if (pathname === '/api/rpa/status') {
-        await ensureRpaTables(env);
         const jobId = url.searchParams.get('job');
         if (!jobId) return json({ error: 'job obrigatório' }, 400);
         const desde = Number(url.searchParams.get('desde') || 0);
 
+        if (ponteAtiva(env)) {
+          const { status, dados } = await ponteChamar(
+            env,
+            `/jobs/status?job=${encodeURIComponent(jobId)}&desde=${encodeURIComponent(String(desde))}`,
+          );
+          if (status === 404) return json({ error: 'lote não encontrado' }, 404);
+          if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+          // A ponte responde achatado; a tela espera { job, eventos }. Traduz
+          // aqui pra não mexer no front. (criadoEm/terminadoEm a ponte não dá.)
+          const st = String(dados.status || 'montando');
+          return json({
+            job: {
+              jobId,
+              status: st,
+              total: Number(dados.total || 0),
+              erro: (dados.erro as string | null) || null,
+              runUrl: (dados.run_url as string | null) || null,
+              criadoEm: '',
+              terminadoEm: null,
+              aberto: RPA_STATUS_ABERTOS.includes(st),
+            },
+            eventos: (Array.isArray(dados.eventos) ? dados.eventos : []).map((r: any) => ({
+              id: Number(r.id),
+              at: String(r.criado_em || ''),
+              identifier: String(r.identifier || ''),
+              status: String(r.status || 'info'),
+              message: String(r.message || ''),
+            })),
+          });
+        }
+
+        await ensureRpaTables(env);
         const jobRes = await env.DB.query(
           `SELECT job_id, status, total, erro, run_url, created_at, finished_at
              FROM rpa_jobs WHERE job_id = ?`, [jobId],
@@ -1430,8 +1645,27 @@ export default {
 
       // Histórico -- os últimos lotes de quem está olhando a tela.
       if (pathname === '/api/rpa/lotes') {
+        const userEmail = emailDeQuemChama(request) || null;
+
+        if (ponteAtiva(env)) {
+          const q = userEmail ? `?user=${encodeURIComponent(userEmail)}` : '';
+          const { status, dados } = await ponteChamar(env, `/jobs${q}`);
+          if (status >= 400 || dados.error) return json({ error: erroDaPonte(dados, status) }, 502);
+          // A ponte devolve as linhas crus do banco dela.
+          return json({
+            lotes: (Array.isArray(dados.lotes) ? dados.lotes : []).map((row: any) => ({
+              jobId: String(row.job_id),
+              criadoEm: String(row.created_at || ''),
+              status: String(row.status),
+              total: Number(row.total || 0),
+              erro: (row.erro as string | null) || null,
+              runUrl: (row.run_url as string | null) || null,
+              criadoPor: displayNameFromEmail(row.user_email as string | null),
+            })),
+          });
+        }
+
         await ensureRpaTables(env);
-        const userEmail = request.headers.get('x-godeploy-user-email') || null;
         const r = await env.DB.query(
           `SELECT job_id, created_at, status, total, erro, run_url, user_email
              FROM rpa_jobs
