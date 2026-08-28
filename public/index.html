@@ -4248,6 +4248,25 @@
     rpaAtualizarBotao();
   }
 
+  /* Enquanto o código está na tela, a sessão pode chegar a qualquer momento;
+     a tela vira verde sozinha e ninguém precisa recarregar pra descobrir que
+     deu certo. Mas isso PARA quando o código morre: uma aba esquecida aberta
+     ficaria consultando de 4 em 4s pra sempre. O corte é o mesmo prazo que
+     está escrito na tela. */
+  function rpaEsperarSessao(minutos) {
+    const limite = Date.now() + Math.max(1, Number(minutos) || 10) * 60000;
+    if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
+    rpaSessaoTimer = setInterval(() => {
+      if (Date.now() > limite) {
+        clearInterval(rpaSessaoTimer);
+        rpaSessaoTimer = null;
+        $('rpaCodigoTexto').textContent = 'Este código expirou. Clique em "Gerar outro código" para continuar.';
+        return;
+      }
+      rpaCarregarSessao();   // vira verde e mata o timer quando existe:true
+    }, 4000);
+  }
+
   async function rpaPedirCodigo() {
     const btn = $('rpaConectar');
     const rotulo = btn.textContent;
@@ -4260,10 +4279,7 @@
       $('rpaCodigoTexto').textContent =
         `Abra o programa Conectar_Catalog no seu PC e digite este código. Ele vale ${d.valido_por_minutos || 10} minutos.`;
       $('rpaCodigoBox').classList.remove('hidden');
-      // Quando o programinha entregar a sessão, a tela vira verde sozinha --
-      // ninguém precisa recarregar pra descobrir que deu certo.
-      if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
-      rpaSessaoTimer = setInterval(rpaCarregarSessao, 4000);
+      rpaEsperarSessao(d.valido_por_minutos);
     } catch (e) {
       $('rpaSessaoStatus').className = 'rpaAviso falta';
       $('rpaSessaoStatus').textContent = 'Não consegui gerar o código: ' + e.message;
