@@ -4262,6 +4262,12 @@
   let rpaUltimoEvento = 0;
   let rpaSessao = { existe: false };   // acesso da pessoa ao Catalog, guardado na ponte
   let rpaSessaoTimer = null;           // enquanto o código está na tela, espera o programinha
+  /* Qual sessão já estava guardada quando o código foi pedido. Serve pra
+     distinguir "o programinha entregou agora" de "tinha uma sessão velha aí" --
+     sem isso, quem reconecta vê o código sumir da tela em 4 segundos. Guardamos
+     o carimbo que a PONTE devolve, não a hora do navegador: comparar relógios
+     de máquinas diferentes é justamente o tipo de coisa que quebra sozinha. */
+  let rpaSessaoAoPedir = null;         // { existe, atualizada_em } ou null se não há código na tela
 
   function rpaSlug(txt) {
     return String(txt)
@@ -4565,6 +4571,7 @@
       const d = await r.json();
       if (d.error) throw new Error(d.error);
       rpaSessao.existe = !!d.existe;
+      rpaSessao.atualizada_em = d.atualizada_em || null;
 
       if (d.existe) {
         const quando = rpaHorasTexto(d.horas);
@@ -4573,8 +4580,11 @@
           ? `Seu acesso ao Catalog está guardado (atualizado há ${quando}).`
           : 'Seu acesso ao Catalog está guardado.';
         $('rpaConectar').textContent = 'Reconectar minha conta';
-        $('rpaCodigoBox').classList.add('hidden');
-        if (rpaSessaoTimer) { clearInterval(rpaSessaoTimer); rpaSessaoTimer = null; }
+        if (rpaSessaoChegouAgora(d)) {
+          $('rpaCodigoBox').classList.add('hidden');
+          rpaSessaoAoPedir = null;
+          if (rpaSessaoTimer) { clearInterval(rpaSessaoTimer); rpaSessaoTimer = null; }
+        }
       } else {
         box.className = 'rpaAviso falta';
         box.textContent = 'Seu acesso ao Catalog ainda não está guardado. Conecte sua conta para o robô cadastrar no seu nome.';
@@ -4589,6 +4599,37 @@
     rpaAtualizarBotao();
   }
 
+  /* A sessão que o servidor está mostrando é a que o programinha acabou de
+     entregar, ou a que já estava lá antes? Sem essa pergunta o site esconde o
+     código de pareamento no primeiro retorno de existe:true -- ou seja, 4
+     segundos depois de mostrá-lo, para todo mundo que já conectou uma vez. */
+  function rpaSessaoChegouAgora(d) {
+    if (!rpaSessaoAoPedir) return true;          // não há código na tela
+    if (!rpaSessaoAoPedir.existe) return true;   // não havia sessão: existir já prova
+    // Havia uma sessão antes. Só vale se o carimbo da ponte mudou.
+    if (!d.atualizada_em || !rpaSessaoAoPedir.atualizada_em) return false;
+    return d.atualizada_em !== rpaSessaoAoPedir.atualizada_em;
+  }
+
+  /* Enquanto o código está na tela, a sessão pode chegar a qualquer momento; a
+     tela vira verde sozinha e ninguém precisa recarregar pra descobrir que deu
+     certo. Mas isso PARA quando o código morre: uma aba esquecida aberta ficaria
+     consultando de 4 em 4s pra sempre. O corte é o mesmo prazo escrito na tela. */
+  function rpaEsperarSessao(minutos) {
+    const limite = Date.now() + Math.max(1, Number(minutos) || 10) * 60000;
+    if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
+    rpaSessaoTimer = setInterval(() => {
+      if (Date.now() > limite) {
+        clearInterval(rpaSessaoTimer);
+        rpaSessaoTimer = null;
+        rpaSessaoAoPedir = null;
+        $('rpaCodigoTexto').textContent = 'Este código expirou. Clique em "Gerar outro código" para continuar.';
+        return;
+      }
+      rpaCarregarSessao();   // vira verde e mata o timer quando a sessão NOVA chega
+    }, 4000);
+  }
+
   async function rpaPedirCodigo() {
     const btn = $('rpaConectar');
     const rotulo = btn.textContent;
@@ -4597,14 +4638,16 @@
     btn.textContent = 'Gerando código…';
     try {
       const d = await rpaPost('/api/rpa/pareamento', {});
+      // Fotografa a sessão de antes: é contra ela que a próxima consulta compara.
+      rpaSessaoAoPedir = {
+        existe: !!rpaSessao.existe,
+        atualizada_em: rpaSessao.atualizada_em || null,
+      };
       $('rpaCodigoNum').textContent = d.codigo || '—';
       $('rpaCodigoTexto').textContent =
         `Abra o programa Conectar_Catalog no seu PC e digite este código. Ele vale ${d.valido_por_minutos || 10} minutos.`;
       $('rpaCodigoBox').classList.remove('hidden');
-      // Quando o programinha entregar a sessão, a tela vira verde sozinha --
-      // ninguém precisa recarregar pra descobrir que deu certo.
-      if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
-      rpaSessaoTimer = setInterval(rpaCarregarSessao, 4000);
+      rpaEsperarSessao(d.valido_por_minutos);
     } catch (e) {
       $('rpaSessaoStatus').className = 'rpaAviso falta';
       $('rpaSessaoStatus').textContent = 'Não consegui gerar o código: ' + e.message;
