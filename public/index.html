@@ -1045,6 +1045,12 @@
     <div class="col psdEditorCol">
       <p class="placeholder" id="psdEditorsHint">Envie um PSD e marque um ou mais tamanhos para começar.</p>
       <div id="psdEditors"></div>
+      <!-- Fim da esteira: quem acabou de gerar as adaptações normalmente quer
+           cadastrá-las. Sem isto a pessoa tem que achar a aba sozinha. -->
+      <div class="psdGerarBar hidden" id="psdIrRpaBar" style="margin-top:1rem">
+        <button type="button" class="genBtn" id="psdIrRpa">🤖 Cadastrar no Catalog</button>
+        <p class="note" style="margin:.4rem 0 0">Baixe os PNGs acima e mande o robô cadastrar — ele faz uma por uma, no seu nome.</p>
+      </div>
     </div>
 
     <div class="col psdSideCol psdRightCol">
@@ -1451,6 +1457,12 @@
     t.addEventListener('click', () => {
       setView(t.dataset.view, t.querySelector('.navLabel').textContent.trim());
     });
+  });
+
+  // Atalho do fim da aba "Novo ID" para o cadastro no Catalog.
+  document.getElementById('psdIrRpa').addEventListener('click', () => {
+    setView('rpa', 'Cadastrar no Catalog');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
   // "Novo ID" (PSD) é a view inicial → página larga desde o começo.
   document.querySelector('.page').classList.add('psdWide');
@@ -3703,7 +3715,11 @@
   function relayout(ed) { ed.layout = layoutCompute(PSD_MASKS[ed.maskIdx], ed.S); edRenderStage(ed); }
   const refreshBlock = relayout;
   function refreshAllBlocks() { editors.forEach((ed) => { if (ed.dom) relayout(ed); }); if (isReplicating()) syncAdaptations(); }
-  function updateEditorsHint() { $('psdEditorsHint').classList.toggle('hidden', editors.length > 0); }
+  function updateEditorsHint() {
+    $('psdEditorsHint').classList.toggle('hidden', editors.length > 0);
+    // O atalho pro cadastro só faz sentido quando já existe adaptação na tela.
+    $('psdIrRpaBar').classList.toggle('hidden', editors.length === 0);
+  }
 
   // ===== Replicação: material primário (editors[0]) → adaptações =====
   // O 1º tamanho marcado é o primário. Ligada a caixinha, a composição dele é espelhada
