@@ -329,6 +329,15 @@ async function ensureCopysTable(env: Env): Promise<void> {
   }
 }
 
+/*
+ * Área do logo: NÃO fica mais aqui. A área reservada de cada máscara virou constante fixa no
+ * index.html (LOGO_ZONAS), porque o requisito é que ninguém possa alterá-la pela tela — sem
+ * rota de escrita não existe caminho para alterar, e mudar exige deploy. As rotas
+ * /api/logo-zonas* e a função ensureLogoZonasTable foram removidas; a tabela `logo_zonas`
+ * segue existindo no env.DB, órfã e sem custo, com as 4 linhas semeadas na v90/v91 — se um dia
+ * a edição voltar, o histórico está lá.
+ */
+
 /**
  * Alocação de um item JÁ EXISTENTE (achado na aba "Adaptar ID") numa tag. Diferente de
  * registros_estampas, que é a nomeação de uma estampa NOVA: aqui o produto já existe no
@@ -872,17 +881,28 @@ const CLASSIFY_SQL = `CASE
   WHEN lower(btrim(p.name)) LIKE 'bolsa%garrafa%' THEN 'bolsa-garrafa'
   ELSE NULL END`;
 
-/** Roda um SELECT no banco Site via proxy Metabase-direct (cookie do visitante). */
-async function sqlQuery(env: Env, cookie: string, sql: string): Promise<Record<string, unknown>[]> {
-  const r = await fetch(`${env.PROXY_BASE_URL}/site/_query`, {
+/**
+ * Roda um SELECT em um dos bancos do proxy (`site`, `factory`, ...) com o COOKIE DO VISITANTE:
+ * o acesso é o dele, não do app. Vale lembrar disso ao usar `factory` — quem trabalha em
+ * marketing costuma não ter acesso lá, então toda chamada a `factory` precisa de plano B.
+ */
+async function proxyQuery(env: Env, cookie: string, banco: string, sql: string): Promise<Record<string, unknown>[]> {
+  if (!env.PROXY_BASE_URL) throw new Error('PROXY_BASE_URL não configurado');
+  const r = await fetch(`${env.PROXY_BASE_URL}/${banco}/_query`, {
     method: 'POST',
     headers: { Cookie: cookie, 'content-type': 'application/json' },
     body: JSON.stringify({ sql }),
   });
   if (r.status === 401) throw new Error('not_authenticated');
+  if (r.status === 403) throw new Error(`sem acesso ao banco ${banco}`);
   const t = await r.text();
   if (!r.ok) throw new Error(`query HTTP ${r.status}: ${t.slice(0, 200)}`);
   return (JSON.parse(t).rows as Record<string, unknown>[]) || [];
+}
+
+/** Atalho para o banco Site, que é a origem da maioria das consultas de catálogo daqui. */
+async function sqlQuery(env: Env, cookie: string, sql: string): Promise<Record<string, unknown>[]> {
+  return proxyQuery(env, cookie, 'site', sql);
 }
 
 /** Roda um SELECT no Catalog (Prisma, db 19) via API do Metabase (secret METABASE_TOKEN). */

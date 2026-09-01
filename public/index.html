@@ -155,6 +155,30 @@
   .psdItemRegStatus { font-size: .76rem; margin: 0; min-height: 1em; }
   .psdItemRegStatus.ok { color: var(--primary); }
   .psdItemRegStatus.err { color: var(--danger); }
+  /* Resultado da compressao pro limite do Catalog, embaixo do botao "Baixar PNG". */
+  .psdZipStatus { font-size: .76rem; margin: .4rem 0 0; min-height: 1em; color: var(--muted); }
+  .psdZipStatus.ok { color: var(--primary); }
+  .psdZipStatus.warn { color: var(--warn); }
+  .psdZipStatus.err { color: var(--danger); }
+  /* ---- Area do logo: camada-GUIA do stage. Nao e elemento do PSD, entao nunca sai no PNG. ---- */
+  /* pointer-events:none e o que garante que a guia nao e clicavel nem arrastavel: ela nem
+     recebe evento, e o marquee de selecao do stage continua funcionando por baixo dela. */
+  .logoZona { position: absolute; box-sizing: border-box; z-index: 6; border-radius: 2px;
+    border: 1.5px solid var(--danger); background: rgba(220,38,38,.06); pointer-events: none; }
+  /* Zona sem medida na mascara oficial: tracejada, pra nao passar por dado confirmado. */
+  .logoZona.aproximada { border-style: dashed; background: rgba(220,38,38,.05); }
+  /* Retangulo INTERNO = a caixa do logo. O vao entre ele e a borda externa e a margem de
+     seguranca: nem a estampa nem o logo entram ali. Linha mais fina que a externa, como na
+     mascara oficial. */
+  .logoZonaInterna { position: absolute; box-sizing: border-box; border: 1px solid var(--danger);
+    border-radius: 1px; opacity: .6; pointer-events: none; }
+  .logoZona.aproximada .logoZonaInterna { border-style: dashed; }
+  .logoZona.invadida { background: rgba(220,38,38,.3); box-shadow: 0 0 0 2px rgba(220,38,38,.3); }
+  /* Os tres retangulos (externo, interno, logo) sao posicionados por edPositionLogoZona a
+     partir de caixasDoLogo(); o logo entra no tamanho exato, sem object-fit. */
+  .logoZona img { position: absolute; display: block; opacity: .92; pointer-events: none; }
+  .psdLogoAviso { font-size: .74rem; font-weight: 600; color: var(--danger); margin: .35rem 0 0; min-height: 1em; }
+
   @media (max-width: 900px) { #view-psd { grid-template-columns: 1fr; } }
   .col { display: flex; flex-direction: column; gap: 1.5rem; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; box-shadow: var(--shadow-sm); transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease; }
@@ -597,6 +621,8 @@
 .rpaLinha .amInput{flex:1;min-width:0}
 .rpaLinha .rpaArq{font-size:.75rem;opacity:.6;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rpaRemover{background:none;border:0;color:#ef4444;cursor:pointer;font-size:1rem;line-height:1;padding:.2rem .35rem}
+.rpaLinha .rpaPeso{font-size:.72rem;color:var(--muted);white-space:nowrap}
+.rpaLinha .rpaPeso.err{color:var(--danger);font-weight:600}
 .rpaLog{max-height:340px;overflow:auto;font-size:.82rem;line-height:1.5;border:1px solid var(--bd,#2a3242);border-radius:8px;padding:.6rem .7rem}
 .rpaLog .l{display:flex;gap:.5rem;padding:.1rem 0}
 .rpaLog .l b{flex:none;min-width:150px;opacity:.75;font-weight:600}
@@ -1233,6 +1259,44 @@
     const st = { bg: 'with', withBg: imgEl.src, noBg: null };
     dlEl.href = st.withBg; dlEl.download = baseName + '.png';
     btnEl.textContent = 'Remover fundo';
+    // O href continua sendo o PNG cru (serve de preview e de fallback), mas o CLIQUE baixa a
+    // versao comprimida pro limite do Catalog -- mesmo ladder do board (sem perda > paleta >
+    // resolucao). Sem isso, resultado de IA com gradiente estoura 960KB fácil.
+    let zip = dlEl.nextElementSibling;
+    if (!zip || !zip.classList.contains('js-zip')) {
+      zip = document.createElement('p');
+      zip.className = 'psdZipStatus js-zip';
+      zip.style.flexBasis = '100%';
+      dlEl.insertAdjacentElement('afterend', zip);
+    }
+    const setZip = (txt, cls) => { zip.textContent = txt; zip.className = 'psdZipStatus js-zip' + (cls ? ' ' + cls : ''); };
+    dlEl.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      if (dlEl.dataset.busy === '1') return;
+      const rotulo = dlEl.textContent, href = dlEl.href, nome = dlEl.download;
+      dlEl.dataset.busy = '1'; dlEl.textContent = 'Comprimindo...'; dlEl.style.opacity = '.65';
+      try {
+        const img = await loadImg(href);
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d');
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, W, H);
+        const r = await comprimirPng(cv, (msg) => setZip('\u23f3 ' + msg));
+        if (!r) {
+          setZip('\u26a0 nao deu pra chegar a ' + fmtKB(PNG_LIMITE) + ' nem com 32 cores e 25% do tamanho \u2014 gere outra versao com menos textura', 'err');
+          return;
+        }
+        dispararDownload(r.blob, nome);
+        setZip('\u2705 ' + resumoCompressao(r), r.escala === 1 ? 'ok' : 'warn');
+      } catch (err) {
+        // Compressao indisponivel: entrega o arquivo cru, mas avisando.
+        dispararDownload(await (await fetch(href)).blob(), nome);
+        setZip('\u26a0 baixado SEM compressao \u2014 ' + err.message, 'err');
+        if (onErr) onErr('Compressao falhou: ' + err.message);
+      } finally {
+        dlEl.dataset.busy = ''; dlEl.textContent = rotulo; dlEl.style.opacity = '';
+      }
+    });
     btnEl.onclick = async () => {
       if (st.bg === 'with') {
         if (!st.noBg) {
@@ -3445,6 +3509,7 @@
       node.style.transform = 'rotate(' + (t.rot || 0) + 'deg)'; };
     put(rec.node, 0, 0);
     rec.ghosts.forEach((g) => put(g, Number(g.dataset.dx) || 0, Number(g.dataset.dy) || 0));
+    edChecarInvasaoAgendada(ed);   // arrastou perto do logo? o aviso acende na hora
   }
   // ===== Seleção múltipla por editor (ed.selSet) =====
   function edApplySelClasses(ed) {
@@ -3630,6 +3695,7 @@
       };
       stage.addEventListener('pointermove', move); stage.addEventListener('pointerup', up);
     };
+    edRenderLogoZona(ed);   // guia da area do logo por ultimo: fica por cima das camadas
     edRestoreSelection(ed, prevSelArr);
     if (ed.dom.zoomPct) ed.dom.zoomPct.textContent = Math.round((ed.zoom || 1) * 100) + '%';
   }
@@ -3740,8 +3806,17 @@
       updatePsdChrome();
     });
     const dl = $('psdDownloadAll');
-    if (dl) dl.addEventListener('click', () => {
-      editors.forEach((ed, i) => setTimeout(() => baixarCanvas(ed), i * 450));
+    // Uma por vez: cada download agora comprime pro limite do Catalog e isso leva segundos.
+    if (dl) dl.addEventListener('click', async () => {
+      if (dl.dataset.busy === '1') return;
+      dl.dataset.busy = '1';
+      const rotulo = dl.textContent;
+      const total = editors.length;
+      for (let i = 0; i < editors.length; i++) {
+        dl.textContent = 'Comprimindo ' + (i + 1) + ' de ' + total + '...';
+        await baixarCanvas(editors[i]);
+      }
+      dl.textContent = rotulo; dl.dataset.busy = '';
     });
   })();
 
@@ -3770,6 +3845,7 @@
       '</div>' +
       '<div class="psdStageWrap"><div class="psdStage js-stage"></div><div class="psdMirrorLock" title="Espelhando o material primário — desligue a replicação para editar"></div></div>' +
       '<p class="psdMirrorBadge">🔒 Espelhando o material primário. Desligue a caixinha “Replicar” (na direita) para editar este tamanho isoladamente.</p>' +
+      '<p class="psdLogoAviso js-logoAviso"></p>' +
       '<div class="psdToolbar">' +
         '<div class="psdAlignBar">' +
           '<button type="button" class="psdMiniBtn js-centerh" title="Centralizar horizontalmente no espaço" disabled>↔ Centralizar H</button>' +
@@ -3794,7 +3870,8 @@
         '<div class="psdCtl"><span>Estilo de adaptação</span><div class="psdBtnRow js-estilo"></div>' +
           '<p class="tipoHint js-esthint" style="margin:.35rem 0 0"></p></div>' +
       '</div>' +
-      '<a class="dlBtn js-dl" style="display:inline-block;margin-top:.75rem">Baixar PNG</a>';
+      '<a class="dlBtn js-dl" style="display:inline-block;margin-top:.75rem">Baixar PNG</a>' +
+      '<p class="psdZipStatus js-zip"></p>';
     const q = (c) => root.querySelector(c);
     const S = ed.S;
     const renderEstilos = () => {
@@ -3851,21 +3928,276 @@
       applyRotation(ed, deg);
     });
     rotResetBtn.addEventListener('click', () => { rotInput.value = 0; applyRotation(ed, 0); });
+
+
     return {
       root, stage: stageEl, wrap: wrapEl, zoomPct: zoomPctEl,
       alignBtns: [centerHBtn, centerVBtn], rotInput, rotControls: [rotInput, rotResetBtn],
       roleBadge: q('.js-role'), itemIdEl, itemSkuEl, itemStatusEl,
+      dlBtn: q('.js-dl'), zipStatus: q('.js-zip'),
+      logoAviso: q('.js-logoAviso'),
     };
   }
 
-  function baixarCanvas(ed) {
+  // ===== Area do logo: reservada, fixa e fora do PNG =====
+  // Em toda mascara existe uma area onde o logo da Gocase e aplicado no produto, e ali a estampa
+  // nao pode entrar. Desenhada como na mascara oficial: DOIS retangulos concentricos --
+  // o externo e a area reservada, o interno e a caixa do logo, e o vao entre eles e a MARGEM DE
+  // SEGURANCA. Tres garantias, nesta ordem:
+  //
+  // 1. NAO SAI NO PNG. E overlay do stage, nao elemento do PSD. O composeFrom itera
+  //    fgElements(), que le PSD.elements -- a guia nunca esta la, entao nao ha caminho pelo qual
+  //    ela vaze. Nao e um filtro que alguem pode esquecer.
+  // 2. O USUARIO NAO MEXE. Sem arraste, campo, botao ou rota de escrita; a tabela e congelada
+  //    (profundamente) e o CSS deixa a guia com pointer-events:none. Mudar exige deploy.
+  // 3. APARECE SEMPRE. Toda mascara tem area: a medida quando existe, uma estimada quando nao.
+  //    A estimada sai tracejada, pra ninguem confundir com medida.
+  //
+  // A ANCORA e a caixa do LOGO, nao os retangulos: e a medida que se confirma no produto, e e
+  // exatamente o que o Factory guarda (logo_pos_x/y + logo_size). Os dois retangulos saem dela
+  // por proporcao.
+  const LOGO_IMG_SRC = 'data:image/png;base64,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';
+  const LOGO_PROPORCAO = 308 / 87;   // largura/altura do arquivo do logo
+  // Proporcoes dos retangulos em relacao ao LOGO, medidas na referencia 2362x2006 (Wellington,
+  // 31/08), que e o padrao visual escolhido. A mascara da Fresh 950 tem o externo ~10% mais
+  // folgado (1,364 contra 1,229 de largura) -- as duas referencias oficiais divergem nisso, e
+  // aqui vale a nova.
+  const LOGO_INTERNA_L = 262 / 245, LOGO_INTERNA_A = 90 / 70;
+  const LOGO_EXTERNA_L = 301 / 245, LOGO_EXTERNA_A = 135 / 70;
+  // Para estimar o logo onde nao ha medida: fracoes da mascara medidas na Fresh 950 (largura do
+  // logo e distancia da base do retangulo externo ate o rodape).
+  const LOGO_FRACAO_LARGURA = 308 / 3380;
+  const LOGO_FRACAO_RODAPE = (2114 - 2018) / 2114;
+
+  // Object.freeze e RASO: sem congelar cada linha, um `LOGO_ZONAS['3380x2114'].x = 0` passaria.
+  const congelarZonas = (tabela) => Object.freeze(Object.fromEntries(
+    Object.entries(tabela).map(([chave, z]) => [chave, Object.freeze(z)])));
+  // Caixa do LOGO por mascara ("<largura>x<altura>" da mascara): canto superior-esquerdo e
+  // largura. A altura sai de LOGO_PROPORCAO.
+  //   medida   = lida na mascara oficial, pixel a pixel.
+  //   derivada = logo_pos_x/logo_pos_y/logo_size do Factory, sem conversao. O Y de lá e ruim: em
+  //              duas delas a area sai da mascara e e deslocada pra dentro. Conferir no produto.
+  // Para acrescentar uma mascara: medir a caixa do logo na imagem oficial e por a linha aqui.
+  const LOGO_ZONAS = congelarZonas({
+    '3380x2114': { x: 1536, y: 1898, largura: 308, origem: 'medida',   nota: 'Garrafa Fresh 950' },
+    '3488x1890': { x: 1505, y: 1600, largura: 478, origem: 'derivada', nota: 'Copo Life 600ml' },
+    '2754x1335': { x: 1184, y: 1303, largura: 412, origem: 'derivada', nota: 'Garrafa Kids 460 / Mini 350' },
+    '3947x818':  { x: 1840, y: 709,  largura: 404, origem: 'derivada', nota: 'Taca Drink 420' },
+  });
+  const mascaraKey = (mk) => mk.w + 'x' + mk.h;
+
+  // Logo estimado pra mascara sem medida: mesma geometria relativa da Fresh 950.
+  function logoEstimado(mk) {
+    const largura = Math.max(1, Math.round(mk.w * LOGO_FRACAO_LARGURA));
+    const altura = largura / LOGO_PROPORCAO;
+    // A distancia do rodape e medida ate a base do retangulo EXTERNO, nao do logo.
+    const extAltura = altura * LOGO_EXTERNA_A;
+    const baseExterna = Math.round(mk.h * (1 - LOGO_FRACAO_RODAPE));
+    const y = Math.max(0, Math.round(baseExterna - extAltura + (extAltura - altura) / 2));
+    return { x: Math.round((mk.w - largura) / 2), y, largura, origem: 'estimada',
+             nota: 'máscara oficial ainda não medida' };
+  }
+
+  // Os tres retangulos em pixels da mascara, concentricos no logo. Se o externo passar da
+  // mascara, os tres andam juntos pra dentro (acontece nas duas derivadas de Y ruim do Factory).
+  // Cacheado: varias funcoes pedem isso por frame.
+  const LOGO_CAIXAS = new Map();
+  function caixasDoLogo(mk) {
+    const chave = mascaraKey(mk);
+    if (LOGO_CAIXAS.has(chave)) return LOGO_CAIXAS.get(chave);
+    const base = LOGO_ZONAS[chave] || logoEstimado(mk);
+    const lw = base.largura, lh = lw / LOGO_PROPORCAO;
+    const cx = base.x + lw / 2, cy = base.y + lh / 2;
+    const extL = lw * LOGO_EXTERNA_L, extA = lh * LOGO_EXTERNA_A;
+    const ex = cx - extL / 2, ey = cy - extA / 2;
+    const dx = Math.min(0, mk.w - (ex + extL)) - Math.min(0, ex);
+    const dy = Math.min(0, mk.h - (ey + extA)) - Math.min(0, ey);
+    const centrado = (largura, altura) => ({
+      x: Math.round(cx + dx - largura / 2), y: Math.round(cy + dy - altura / 2),
+      largura: Math.round(largura), altura: Math.round(altura),
+    });
+    const caixas = Object.freeze({
+      externa: centrado(extL, extA),
+      interna: centrado(lw * LOGO_INTERNA_L, lh * LOGO_INTERNA_A),
+      logo: centrado(lw, lh),
+      origem: base.origem,
+      nota: base.nota || '',
+    });
+    LOGO_CAIXAS.set(chave, caixas);
+    return caixas;
+  }
+
+  // Caixa alinhada aos eixos de uma camada girada (o giro e em torno do proprio centro).
+  function caixaGirada(t, dx, dy) {
+    const x = t.x + dx, y = t.y + dy;
+    const rot = (t.rot || 0) % 360;
+    if (!rot) return { x1: x, y1: y, x2: x + t.w, y2: y + t.h };
+    const rad = rot * Math.PI / 180, c = Math.abs(Math.cos(rad)), sn = Math.abs(Math.sin(rad));
+    const w = t.w * c + t.h * sn, h = t.w * sn + t.h * c;
+    const cx = x + t.w / 2, cy = y + t.h / 2;
+    return { x1: cx - w / 2, y1: cy - h / 2, x2: cx + w / 2, y2: cy + h / 2 };
+  }
+  // Alguma camada que VAI SAIR no PNG entra na area reservada (o retangulo EXTERNO -- a estampa
+  // nao pode invadir nem a margem de seguranca)? Conta os fantasmas do rapport/pattern, que
+  // tambem imprimem, e ignora as guias de fonte, que nao.
+  function edChecarInvasao(ed) {
+    if (!ed.dom || !ed.layout) return false;
+    const mk = PSD_MASKS[ed.maskIdx], z = caixasDoLogo(mk).externa, aviso = ed.dom.logoAviso;
+    const zx2 = z.x + z.largura, zy2 = z.y + z.altura;
+    const L = ed.layout;
+    const els = (L.onlyStar ? [L.star] : fgElements()).filter((e) => e && e.kind !== 'fonte');
+    const deslocs = [{ dx: 0, dy: 0 }].concat(L.onlyStar ? [] : wrapOffsets(mk, ed.S));
+    let invade = 0;
+    for (const e of els) {
+      const t = L.T.get(e); if (!t) continue;
+      for (const o of deslocs) {
+        const c = caixaGirada(t, o.dx, o.dy);
+        if (c.x1 < zx2 && c.x2 > z.x && c.y1 < zy2 && c.y2 > z.y) { invade++; break; }
+      }
+    }
+    if (ed.logoNodes) ed.logoNodes.zona.classList.toggle('invadida', invade > 0);
+    if (aviso) {
+      aviso.textContent = invade
+        ? '⚠ ' + (invade > 1 ? invade + ' elementos entram' : '1 elemento entra') + ' na área do logo — no produto a arte vai ficar por baixo dele.'
+        : '';
+    }
+    return invade > 0;
+  }
+  // Durante o arraste de uma camada isso e chamado a cada frame; coalesce num rAF por editor.
+  function edChecarInvasaoAgendada(ed) {
+    if (ed._invasaoAgendada) return;
+    ed._invasaoAgendada = true;
+    requestAnimationFrame(() => { ed._invasaoAgendada = false; edChecarInvasao(ed); });
+  }
+  function edRenderLogoZona(ed) {
+    if (!ed.dom) return;
+    const stage = ed.dom.stage;
+    stage.querySelectorAll('.logoZona').forEach((n) => n.remove());
+    const c = caixasDoLogo(PSD_MASKS[ed.maskIdx]);
+    const zona = document.createElement('div');   // o proprio elemento e o retangulo EXTERNO
+    zona.className = 'logoZona' + (c.origem === 'medida' ? '' : ' aproximada');
+    zona.innerHTML = '<span class="logoZonaInterna"></span>'
+      + '<img src="' + LOGO_IMG_SRC + '" alt="logo Gocase">';
+    stage.appendChild(zona);
+    ed.logoNodes = { zona, interna: zona.querySelector('.logoZonaInterna'), img: zona.querySelector('img') };
+    edPositionLogoZona(ed);
+    edChecarInvasao(ed);
+  }
+  function edPositionLogoZona(ed) {
+    if (!ed.logoNodes) return;
+    const c = caixasDoLogo(PSD_MASKS[ed.maskIdx]), d = ed.disp, n = ed.logoNodes;
+    const ex = c.externa;
+    n.zona.style.left = (ex.x * d) + 'px'; n.zona.style.top = (ex.y * d) + 'px';
+    n.zona.style.width = (ex.largura * d) + 'px'; n.zona.style.height = (ex.altura * d) + 'px';
+    // interno e logo posicionados em relacao ao externo, que e o elemento pai
+    const dentro = (el, r) => {
+      if (!el) return;
+      el.style.left = ((r.x - ex.x) * d) + 'px'; el.style.top = ((r.y - ex.y) * d) + 'px';
+      el.style.width = (r.largura * d) + 'px'; el.style.height = (r.altura * d) + 'px';
+    };
+    dentro(n.interna, c.interna);
+    dentro(n.img, c.logo);
+  }
+
+  // ===== Compressao de PNG para o limite do Catalog =====
+  // O Catalog recusa imagem acima de 960KB. Cada download passa por um ladder que vai da
+  // perda ZERO para a maior, parando no primeiro degrau que couber:
+  //   1. zera o RGB dos pixels 100% transparentes (invisivel, mas ajuda muito o deflate);
+  //   2. PNG sem perda nenhuma;
+  //   3. paleta com o MAIOR numero de cores que ainda caiba (256 -> 32, busca binaria);
+  //   4. so em ultimo caso, resolucao menor em passos de 10% -- e a tela avisa quando isso
+  //      acontece, porque ai o arquivo deixou de ter a dimensao exata da mascara.
+  // O trabalho pesado roda no /vendor/png-worker.js pra tela nao congelar.
+  // 960.000 bytes (e nao 960*1024): assim o arquivo cabe nas duas leituras possiveis do limite.
+  const PNG_LIMITE = 960 * 1000;
+  const PNG_ESCALA_MIN = 0.25;   // abaixo disso o arquivo nao serve mais pra impressao
+  const fmtKB = (b) => (b / 1024).toFixed(0) + 'KB';
+  let pngWorker = null, pngSeq = 0;
+  function getPngWorker() {
+    if (!pngWorker) pngWorker = new Worker('/vendor/png-worker.js');
+    return pngWorker;
+  }
+  // Manda um RGBA cru pro worker e espera a resposta daquele id. O buffer vai transferido
+  // (sem copia) -- por isso quem chama nao pode usar o buffer depois.
+  function pedirCompressao(rgbaBuf, w, h, tentarLossless) {
+    return new Promise((resolve, reject) => {
+      const wk = getPngWorker(), id = ++pngSeq;
+      const limpa = () => { wk.removeEventListener('message', onMsg); wk.removeEventListener('error', onErr); };
+      const onMsg = (ev) => { if (!ev.data || ev.data.id !== id) return; limpa(); resolve(ev.data); };
+      const onErr = (e) => { limpa(); pngWorker = null; reject(new Error(e.message || 'worker de compressao falhou')); };
+      wk.addEventListener('message', onMsg); wk.addEventListener('error', onErr);
+      wk.postMessage({ id, rgba: rgbaBuf, w, h, limite: PNG_LIMITE, tentarLossless }, [rgbaBuf]);
+    });
+  }
+  function reduzCanvas(cv, escala) {
+    const w = Math.max(1, Math.round(cv.width * escala)), h = Math.max(1, Math.round(cv.height * escala));
+    const out = document.createElement('canvas'); out.width = w; out.height = h;
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cv, 0, 0, w, h);
+    return out;
+  }
+  // Devolve { blob, bytes, cores, semPerda, escala, w, h }, ou null quando nem 25% do tamanho
+  // com 32 cores couber (arte com textura fina numa mascara enorme -- ai o problema e a arte).
+  async function comprimirPng(cv, aviso) {
+    let escala = 1;
+    for (let volta = 0; volta < 8; volta++) {
+      const alvo = escala === 1 ? cv : reduzCanvas(cv, escala);
+      if (aviso) aviso(escala === 1 ? 'comprimindo...' : 'testando ' + Math.round(escala * 100) + '% do tamanho...');
+      const rgba = alvo.getContext('2d').getImageData(0, 0, alvo.width, alvo.height).data.buffer;
+      const r = await pedirCompressao(rgba, alvo.width, alvo.height, escala === 1);
+      if (r.erro) throw new Error(r.erro);
+      if (r.ok) return { blob: new Blob([r.png], { type: 'image/png' }), bytes: r.bytes,
+        cores: r.cores, semPerda: r.semPerda, escala, w: alvo.width, h: alvo.height };
+      // Nem com 32 cores cabe. Em vez de descer de 10 em 10 (cada tentativa custa segundos
+      // numa mascara grande), estima a escala pelo menor tamanho alcancado: o peso do PNG
+      // acompanha a AREA, logo o lado precisa cair pela raiz da razao. Os 0.95 sao folga.
+      const estimada = Math.sqrt(PNG_LIMITE / r.menorBytes) * 0.95;
+      const proxima = Math.floor(Math.min(escala - 0.05, estimada) * 20) / 20;
+      if (!(proxima >= PNG_ESCALA_MIN)) return null;
+      escala = proxima;
+    }
+    return null;
+  }
+  // Texto curto do que a compressao fez, pra pessoa saber o que esta levando pro Catalog.
+  function resumoCompressao(r) {
+    const partes = [fmtKB(r.bytes), r.semPerda ? 'sem perda' : r.cores + ' cores'];
+    if (r.escala !== 1) partes.push(Math.round(r.escala * 100) + '% da resolucao (' + r.w + '×' + r.h + ')');
+    return partes.join(' · ');
+  }
+  function dispararDownload(blob, nome) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = nome; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+
+  async function baixarCanvas(ed) {
     const mk = PSD_MASKS[ed.maskIdx];
-    composeFrom(ed).toBlob((blob) => {
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-      a.download = `estampa-${mk.key}-${mk.w}x${mk.h}.png`; a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    }, 'image/png');
-    registrarItemAdaptado(ed, mk);
+    const nome = `estampa-${mk.key}-${mk.w}x${mk.h}.png`;
+    const zip = ed.dom.zipStatus, btn = ed.dom.dlBtn;
+    const setZip = (txt, cls) => { if (zip) { zip.textContent = txt; zip.className = 'psdZipStatus js-zip' + (cls ? ' ' + cls : ''); } };
+    if (btn && btn.dataset.busy === '1') return;   // clique duplo nao dispara dois downloads
+    if (btn) { btn.dataset.busy = '1'; btn.textContent = 'Comprimindo...'; btn.style.opacity = '.65'; }
+    try {
+      const r = await comprimirPng(composeFrom(ed), (msg) => setZip('\u23f3 ' + msg));
+      if (!r) {
+        setZip('\u26a0 nao deu pra chegar a ' + fmtKB(PNG_LIMITE) + ' nem com 32 cores e 25% do tamanho \u2014 simplifique a arte (menos textura/gradiente)', 'err');
+        return;
+      }
+      dispararDownload(r.blob, nome);
+      setZip('\u2705 ' + resumoCompressao(r), r.escala === 1 ? 'ok' : 'warn');
+      registrarItemAdaptado(ed, mk);
+    } catch (err) {
+      // Worker/lib fora do ar: melhor entregar o PNG cru (como era antes) do que travar o
+      // trabalho -- mas deixando claro que esse arquivo pode ser recusado no Catalog.
+      composeFrom(ed).toBlob((blob) => {
+        dispararDownload(blob, nome);
+        setZip('\u26a0 baixado SEM compressao (' + fmtKB(blob.size) + ') \u2014 ' + err.message, 'err');
+      }, 'image/png');
+      registrarItemAdaptado(ed, mk);
+    } finally {
+      if (btn) { btn.dataset.busy = ''; btn.textContent = 'Baixar PNG'; btn.style.opacity = ''; }
+    }
   }
 
   // Registra o item (produto/tamanho) no momento do download — só então vira uma linha na(s)
@@ -3930,12 +4262,6 @@
   let rpaUltimoEvento = 0;
   let rpaSessao = { existe: false };   // acesso da pessoa ao Catalog, guardado na ponte
   let rpaSessaoTimer = null;           // enquanto o código está na tela, espera o programinha
-  /* Qual sessão já estava guardada quando o código foi pedido. Serve pra
-     distinguir "o programinha entregou agora" de "tinha uma sessão velha aí" --
-     sem isso, quem reconecta vê o código sumir da tela em 4 segundos. Guardamos
-     o carimbo que a PONTE devolve, não a hora do navegador: comparar relógios
-     de máquinas diferentes é justamente o tipo de coisa que quebra sozinha. */
-  let rpaSessaoAoPedir = null;         // { existe, atualizada_em } ou null se nenhum código na tela
 
   function rpaSlug(txt) {
     return String(txt)
@@ -4028,13 +4354,20 @@
         const arq = document.createElement('span');
         arq.className = 'rpaArq';
         arq.textContent = item.file.name;
+        // O Catalog recusa imagem acima de 960KB. O PNG baixado pelo board ja sai comprimido;
+        // este aviso pega arquivo que veio de outra origem (Photoshop, Drive, lote antigo).
+        const grande = item.file.size > PNG_LIMITE;
+        const peso = document.createElement('span');
+        peso.className = 'rpaPeso' + (grande ? ' err' : '');
+        peso.textContent = fmtKB(item.file.size) + (grande ? ' \u26a0' : '');
+        if (grande) peso.title = 'Acima de ' + fmtKB(PNG_LIMITE) + ' \u2014 o Catalog recusa. Baixe a estampa de novo pelo board: o download ja comprime.';
         const rm = document.createElement('button');
         rm.type = 'button';
         rm.className = 'rpaRemover';
         rm.title = 'Remover';
         rm.textContent = '✕';
         rm.addEventListener('click', () => { rpaArquivos.splice(i, 1); rpaRenderLista(); });
-        li.append(input, arq, rm);
+        li.append(input, arq, peso, rm);
         ul.appendChild(li);
       });
     }
@@ -4049,9 +4382,11 @@
 
     // Botão cinza sem explicação é o que gera chamado. O motivo fica escrito.
     const motivo = $('rpaMotivoBloqueio');
+    const pesados = rpaArquivos.filter((a) => a.file.size > PNG_LIMITE).length;
     const texto = faltaAcesso
       ? 'Conecte sua conta do Catalog ali em cima para poder disparar o lote. Você já pode montar a lista de estampas.'
-      : (rpaPollTimer ? 'Tem um lote em andamento — espere ele terminar.' : '');
+      : (rpaPollTimer ? 'Tem um lote em andamento — espere ele terminar.'
+      : (pesados ? `⚠ ${pesados} arquivo(s) acima de ${fmtKB(PNG_LIMITE)} — o Catalog recusa esse tamanho. Baixe essas estampas de novo pelo board, que agora comprime no download.` : ''));
     motivo.textContent = texto;
     motivo.classList.toggle('hidden', !texto);
 
@@ -4230,7 +4565,6 @@
       const d = await r.json();
       if (d.error) throw new Error(d.error);
       rpaSessao.existe = !!d.existe;
-      rpaSessao.atualizada_em = d.atualizada_em || null;
 
       if (d.existe) {
         const quando = rpaHorasTexto(d.horas);
@@ -4239,11 +4573,8 @@
           ? `Seu acesso ao Catalog está guardado (atualizado há ${quando}).`
           : 'Seu acesso ao Catalog está guardado.';
         $('rpaConectar').textContent = 'Reconectar minha conta';
-        if (rpaSessaoChegouAgora(d)) {
-          $('rpaCodigoBox').classList.add('hidden');
-          rpaSessaoAoPedir = null;
-          if (rpaSessaoTimer) { clearInterval(rpaSessaoTimer); rpaSessaoTimer = null; }
-        }
+        $('rpaCodigoBox').classList.add('hidden');
+        if (rpaSessaoTimer) { clearInterval(rpaSessaoTimer); rpaSessaoTimer = null; }
       } else {
         box.className = 'rpaAviso falta';
         box.textContent = 'Seu acesso ao Catalog ainda não está guardado. Conecte sua conta para o robô cadastrar no seu nome.';
@@ -4258,38 +4589,6 @@
     rpaAtualizarBotao();
   }
 
-  /* A sessão que o servidor está mostrando é a que o programinha acabou de
-     entregar, ou a que já estava lá antes? Sem essa pergunta o site esconde o
-     código de pareamento no primeiro retorno de existe:true -- ou seja, 4
-     segundos depois de mostrá-lo, para todo mundo que já conectou uma vez. */
-  function rpaSessaoChegouAgora(d) {
-    if (!rpaSessaoAoPedir) return true;          // não há código na tela
-    if (!rpaSessaoAoPedir.existe) return true;   // não havia sessão: existir já prova
-    // Havia uma sessão antes. Só vale se o carimbo da ponte mudou.
-    if (!d.atualizada_em || !rpaSessaoAoPedir.atualizada_em) return false;
-    return d.atualizada_em !== rpaSessaoAoPedir.atualizada_em;
-  }
-
-  /* Enquanto o código está na tela, a sessão pode chegar a qualquer momento;
-     a tela vira verde sozinha e ninguém precisa recarregar pra descobrir que
-     deu certo. Mas isso PARA quando o código morre: uma aba esquecida aberta
-     ficaria consultando de 4 em 4s pra sempre. O corte é o mesmo prazo que
-     está escrito na tela. */
-  function rpaEsperarSessao(minutos) {
-    const limite = Date.now() + Math.max(1, Number(minutos) || 10) * 60000;
-    if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
-    rpaSessaoTimer = setInterval(() => {
-      if (Date.now() > limite) {
-        clearInterval(rpaSessaoTimer);
-        rpaSessaoTimer = null;
-        rpaSessaoAoPedir = null;
-        $('rpaCodigoTexto').textContent = 'Este código expirou. Clique em "Gerar outro código" para continuar.';
-        return;
-      }
-      rpaCarregarSessao();   // vira verde e mata o timer quando existe:true
-    }, 4000);
-  }
-
   async function rpaPedirCodigo() {
     const btn = $('rpaConectar');
     const rotulo = btn.textContent;
@@ -4298,16 +4597,14 @@
     btn.textContent = 'Gerando código…';
     try {
       const d = await rpaPost('/api/rpa/pareamento', {});
-      // Fotografa a sessão de antes: é contra ela que a próxima consulta compara.
-      rpaSessaoAoPedir = {
-        existe: !!rpaSessao.existe,
-        atualizada_em: rpaSessao.atualizada_em || null,
-      };
       $('rpaCodigoNum').textContent = d.codigo || '—';
       $('rpaCodigoTexto').textContent =
         `Abra o programa Conectar_Catalog no seu PC e digite este código. Ele vale ${d.valido_por_minutos || 10} minutos.`;
       $('rpaCodigoBox').classList.remove('hidden');
-      rpaEsperarSessao(d.valido_por_minutos);
+      // Quando o programinha entregar a sessão, a tela vira verde sozinha --
+      // ninguém precisa recarregar pra descobrir que deu certo.
+      if (rpaSessaoTimer) clearInterval(rpaSessaoTimer);
+      rpaSessaoTimer = setInterval(rpaCarregarSessao, 4000);
     } catch (e) {
       $('rpaSessaoStatus').className = 'rpaAviso falta';
       $('rpaSessaoStatus').textContent = 'Não consegui gerar o código: ' + e.message;
@@ -4335,4 +4632,5 @@
       ul.innerHTML = `<li class="tagEmpty">Não consegui carregar: ${e.message}</li>`;
     }
   }
+
 </script>
